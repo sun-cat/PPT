@@ -1,0 +1,19 @@
+{
+  "name": "shengcai-mini-ppt-courseware",
+  "version": "6.9.2",
+  "private": true,
+  "type": "module",
+  "description": "生财有术mini航海原创PPT课件工具箱：生成 16:9 PPT、关键词约束笔记、商品拼图和场景透视图。",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "jszip": "3.10.1",
+    "pptxgenjs": "4.0.1",
+    "undici": "6.21.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

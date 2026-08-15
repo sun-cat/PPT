@@ -1,0 +1,11 @@
+.env
+node_modules/
+.pnpm-store/
+output/
+*.log
+Image2-PPT-Studio-share*.zip
+VisionDeck-share*.zip
+VisionDeck-v3/
+VisionDeck-v4/
+生财有术mini航海原创PPT课件-双系统版*.zip
+生财有术mini航海原创PPT课件-v*/

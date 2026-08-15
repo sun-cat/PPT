@@ -1,0 +1,1229 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>生财有术 · mini航海原创PPT课件</title>
+    <link rel="stylesheet" href="/styles.css?v=20260808-voyage-ui" />
+  </head>
+  <body>
+    <a class="skip-link" href="#coursewareWorkspace">跳到主要内容</a>
+    <div class="noise"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="生财有术·mini航海 AI 原创 PPT 课件工具首页，作者舒蓬">
+        <span class="brand-symbol" aria-hidden="true">
+          <img src="/assets/shengcai-logo.png" alt="" width="276" height="98" />
+        </span>
+        <span class="brand-copy">
+          <strong>生财有术 <i>· mini航海</i></strong>
+          <small class="brand-meta">
+            <span class="brand-workbench">AI 原创 PPT 课件工作台</span>
+            <span class="brand-author">舒蓬出品 · 微信 844570</span>
+          </small>
+        </span>
+      </a>
+
+      <nav class="workspace-switcher" aria-label="工具选择">
+        <button class="workspace-tab active" data-workspace="courseware" type="button" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-5l2 3h-7l2-3h-5A1.5 1.5 0 0 1 4 14.5z"/></svg>
+          <span>AI 课件</span>
+        </button>
+        <button class="workspace-tab" data-workspace="notes" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13 7 4 4M4 20l1-4 3 3"/></svg>
+          <span>笔记写作</span>
+        </button>
+        <button class="workspace-tab" data-workspace="collage" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="12" y="3" width="9" height="12" rx="1"/><rect x="3" y="12" width="7" height="9" rx="1"/><rect x="12" y="17" width="9" height="4" rx="1"/></svg>
+          <span>PPT 拼图</span>
+        </button>
+        <button class="workspace-tab" data-workspace="perspective" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 6 14-2-2 15-13 1z"/><circle cx="5" cy="6" r="1.5"/><circle cx="19" cy="4" r="1.5"/><circle cx="17" cy="19" r="1.5"/><circle cx="4" cy="20" r="1.5"/></svg>
+          <span>场景换图</span>
+        </button>
+      </nav>
+
+      <div class="top-actions">
+        <span id="connectionState" class="connection-state" role="status" aria-live="polite">
+          <i></i><span>API 未配置</span>
+        </span>
+        <button id="apiSettingsButton" class="button ghost" type="button">
+          接口设置
+        </button>
+        <button id="archiveButton" class="button text-button archive-entry-button courseware-only-action" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v14l-7-3-7 3z" />
+          </svg>
+          <span>课件时光舱</span>
+          <b id="archiveCountBadge" hidden>0</b>
+        </button>
+        <button id="importButton" class="button text-button courseware-only-action" type="button">导入方案</button>
+        <button id="exportPlanButton" class="button text-button courseware-only-action" type="button">
+          保存方案
+        </button>
+        <input id="importInput" type="file" accept="application/json,.json" hidden />
+      </div>
+    </header>
+
+    <main id="coursewareWorkspace" class="app-main workspace-panel" data-workspace-panel="courseware">
+      <nav class="wizard-progress shell" aria-label="课件制作步骤">
+        <button class="step-tab active" data-step="1" type="button">
+          <span>1</span>
+          <strong>页纲内容</strong>
+          <small>填写每页文字</small>
+        </button>
+        <i></i>
+        <button class="step-tab" data-step="2" type="button" disabled>
+          <span>2</span>
+          <strong>参考图片</strong>
+          <small>参考并二创</small>
+        </button>
+        <i></i>
+        <button class="step-tab" data-step="3" type="button" disabled>
+          <span>3</span>
+          <strong>逐页要求</strong>
+          <small>风格与元素</small>
+        </button>
+        <i></i>
+        <button class="step-tab" data-step="4" type="button" disabled>
+          <span>4</span>
+          <strong>生成画面</strong>
+          <small>检查与重试</small>
+        </button>
+        <i></i>
+        <button class="step-tab" data-step="5" type="button" disabled>
+          <span>5</span>
+          <strong>导出 PPT</strong>
+          <small>一页一张整图</small>
+        </button>
+      </nav>
+
+      <section class="wizard-frame shell">
+        <section class="wizard-panel active" data-step-panel="1">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">STEP 01 · PAGE OUTLINE</p>
+              <h1>添加课件页纲</h1>
+              <p>整段粘贴，系统会自动识别每一页的标题和文字。</p>
+            </div>
+            <span class="optional-badge required">必填</span>
+          </div>
+
+          <div class="outline-layout">
+            <article class="content-card script-card">
+              <div class="card-toolbar">
+                <label class="compact-field title-field">
+                  <span>项目名称</span>
+                  <input
+                    id="deckTitle"
+                    type="text"
+                    value="生财有术mini航海原创PPT课件"
+                  />
+                </label>
+                <div class="toolbar-actions">
+                  <button id="exampleButton" class="button text-button" type="button">
+                    填入示例
+                  </button>
+                  <button id="clearButton" class="button text-button danger-text" type="button">
+                    清空
+                  </button>
+                </div>
+              </div>
+
+              <label class="script-field">
+                <span class="sr-only">页面脚本</span>
+                <textarea
+                  id="scriptInput"
+                  spellcheck="false"
+                  placeholder="第1页
+页面标题：在这里填写标题
+页面文字：
+在这里填写本页需要出现的文字
+
+第2页
+页面标题：第二页标题
+页面文字：
+第二页的正文内容"
+                ></textarea>
+              </label>
+
+              <div class="inline-action">
+                <div id="parseHint" class="parse-hint">
+                  按“第N页 / 页面标题 / 页面文字”格式直接粘贴
+                </div>
+                <button id="parseButton" class="button primary" type="button">
+                  识别页纲
+                  <span>→</span>
+                </button>
+              </div>
+            </article>
+
+            <aside class="guide-stack">
+              <section class="content-card guide-card">
+                <div class="mini-heading">
+                  <span class="mini-icon">例</span>
+                  <div>
+                    <p class="eyebrow">FORMAT GUIDE</p>
+                    <h2>固定填写格式</h2>
+                  </div>
+                </div>
+                <pre><span>第1页</span>
+页面标题：第一页标题
+页面文字：
+第一页正文，可以多行
+
+<span>第2页</span>
+页面标题：第二页标题
+页面文字：
+第二页正文</pre>
+                <p>页面文字会作为图片中的正式文字，请在这里写完整。</p>
+              </section>
+
+              <section class="content-card check-card">
+                <div class="check-row">
+                  <span>识别状态</span>
+                  <strong id="outlineCount">0 页</strong>
+                </div>
+                <div id="warningList" class="warning-list"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="wizard-panel" data-step-panel="2" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">STEP 02 · VISUAL REFERENCE</p>
+              <h1>上传参考图片</h1>
+              <p>借鉴配色、构图和质感，再结合课件内容重新创作。</p>
+            </div>
+            <span class="optional-badge">可选但建议</span>
+          </div>
+
+          <div class="reference-layout">
+            <article class="content-card reference-main">
+              <div class="reference-title">
+                <div>
+                  <span class="reference-kicker">STYLE REFERENCE</span>
+                  <h2>选择一张您觉得好看的图片</h2>
+                </div>
+                <span class="auto-pill">AI 自动分析</span>
+              </div>
+
+              <div id="referenceUploader" class="reference-uploader">
+                <input
+                  id="referenceImageInput"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  hidden
+                />
+                <button id="referenceUploadButton" class="reference-dropzone" type="button">
+                  <span class="upload-mark">＋</span>
+                  <span>
+                    <strong>点击上传或将图片拖到这里</strong>
+                    <small>PNG / JPG / WebP · 最大 12 MB</small>
+                  </span>
+                </button>
+                <div id="referencePreview" class="reference-preview" hidden>
+                  <img id="referencePreviewImage" alt="参考图预览" />
+                  <div class="reference-file-meta">
+                    <strong id="referenceFileName"></strong>
+                    <small id="referenceFileSize"></small>
+                  </div>
+                  <div class="reference-file-actions">
+                    <button id="replaceReferenceButton" class="button ghost" type="button">
+                      更换图片
+                    </button>
+                    <button
+                      id="removeReferenceButton"
+                      class="button text-button danger-text"
+                      type="button"
+                    >
+                      移除
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <p id="referenceStatus" class="reference-status">
+                未上传时，会根据页纲和逐页要求直接生成。
+              </p>
+
+              <details class="reference-options">
+                <summary>指定应用页码或补充要求 <span>一般不需要填写</span></summary>
+                <div class="reference-option-grid">
+                  <label class="field">
+                    <span>只应用这些页</span>
+                    <input
+                      id="referencePages"
+                      type="text"
+                      placeholder="留空应用全部页面，如 1,3-5"
+                    />
+                  </label>
+                  <label class="field">
+                    <span>补充参考要求</span>
+                    <textarea
+                      id="referenceInstruction"
+                      rows="3"
+                      placeholder="例如：保留温暖配色和纸张质感，人物与场景重新设计"
+                    ></textarea>
+                  </label>
+                </div>
+              </details>
+            </article>
+
+            <aside class="content-card recreate-card">
+              <div class="mini-heading">
+                <span class="mini-icon">创</span>
+                <div>
+                  <p class="eyebrow">SECONDARY CREATION</p>
+                  <h2>参考，但不照搬</h2>
+                </div>
+              </div>
+              <ol class="recreate-list">
+                <li>
+                  <span>01</span>
+                  <div><strong>理解视觉语言</strong><p>分析配色、构图、材质、光影和氛围。</p></div>
+                </li>
+                <li>
+                  <span>02</span>
+                  <div><strong>结合本页内容重构</strong><p>重新安排主体、信息层级和文字位置。</p></div>
+                </li>
+                <li>
+                  <span>03</span>
+                  <div><strong>清理原图信息</strong><p>不复制原图文字、Logo、水印和原始排版。</p></div>
+                </li>
+              </ol>
+              <div class="privacy-note">
+                参考图只在当前页面中使用，不会写入方案文件。
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="wizard-panel" data-step-panel="3" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">STEP 03 · PAGE DIRECTION</p>
+              <h1>补充逐页风格与元素</h1>
+              <p>只填写需要特殊处理的页面；整个文本框可以留空。</p>
+            </div>
+            <span class="optional-badge">备选项</span>
+          </div>
+
+          <div class="style-layout">
+            <article class="content-card style-editor">
+              <div class="card-toolbar">
+                <div>
+                  <strong>逐页画面要求</strong>
+                  <small>所有页面要求集中填写，不需要逐页打开表单</small>
+                </div>
+                <div class="toolbar-actions">
+                  <button id="styleExampleButton" class="button text-button" type="button">
+                    填入示例
+                  </button>
+                  <button id="clearStyleButton" class="button text-button danger-text" type="button">
+                    清空
+                  </button>
+                </div>
+              </div>
+              <label class="script-field style-script-field">
+                <span class="sr-only">逐页画面要求</span>
+                <textarea
+                  id="pageStyleInput"
+                  spellcheck="false"
+                  placeholder="第1页
+画面风格：明亮、轻松、现代扁平插画
+添加元素：指南针、航海路线、绿色标记点
+
+第3页
+画面风格：简洁的商业信息图
+添加元素：上升曲线、数据卡片、绿色箭头"
+                ></textarea>
+              </label>
+              <input id="globalPrompt" type="hidden" value="" />
+              <div class="inline-action">
+                <div id="styleParseHint" class="parse-hint">
+                  可完全留空；没有填写的页面会自动设计
+                </div>
+                <button id="parseStyleButton" class="button primary" type="button">
+                  应用逐页要求
+                  <span>→</span>
+                </button>
+              </div>
+            </article>
+
+            <aside class="guide-stack">
+              <section class="content-card guide-card style-guide-card">
+                <div class="mini-heading">
+                  <span class="mini-icon">法</span>
+                  <div>
+                    <p class="eyebrow">HOW TO WRITE</p>
+                    <h2>建议填写方式</h2>
+                  </div>
+                </div>
+                <pre><span>第1页</span>
+画面风格：清新明亮
+添加元素：航海路线、指南针
+
+<span>第4页</span>
+画面风格：商业信息图
+添加元素：曲线、数据卡片</pre>
+                <p>只写有特殊要求的页码，其他页面会自动生成。</p>
+              </section>
+              <section class="content-card check-card">
+                <div class="check-row">
+                  <span>已添加特殊要求</span>
+                  <strong id="styledPageCount">0 页</strong>
+                </div>
+                <div id="styleWarningList" class="warning-list"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="wizard-panel" data-step-panel="4" hidden>
+          <div class="panel-heading generation-heading">
+            <div>
+              <p class="eyebrow">STEP 04 · GENERATE & REVIEW</p>
+              <h1>生成并检查每一页</h1>
+              <p>每页都是一张完整的 16:9 图片，失败或不满意可以单独重试。</p>
+            </div>
+            <div class="generation-actions">
+              <label class="concurrency-control" for="generationConcurrency">
+                <span>同时生成</span>
+                <select id="generationConcurrency" aria-label="同时生成图片数量">
+                  <option value="2" selected>2 张（推荐，更稳）</option>
+                  <option value="4">4 张（较快）</option>
+                  <option value="6">6 张（更快）</option>
+                </select>
+              </label>
+              <button id="generateAllButton" class="button primary large" type="button" disabled>
+                批量生成全部画面
+                <span>↗</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="generation-summary">
+            <div>
+              <strong id="parsedCount">0</strong>
+              <span>页纲页面</span>
+            </div>
+            <div>
+              <strong id="generatedCount">0</strong>
+              <span>已生成画面</span>
+            </div>
+            <div class="generation-progress">
+              <div>
+                <span>生成进度</span>
+                <small id="progressText">等待识别页纲</small>
+              </div>
+              <div class="progress-track"><span id="progressBar"></span></div>
+            </div>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <div class="empty-frame"><span>16:9</span></div>
+            <div>
+              <strong>还没有可生成的页面</strong>
+              <p>请返回第一步填写并识别课件页纲。</p>
+            </div>
+          </div>
+          <div id="slideGrid" class="slide-grid"></div>
+        </section>
+
+        <section class="wizard-panel" data-step-panel="5" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">STEP 05 · EXPORT POWERPOINT</p>
+              <h1>检查完成，导出课件</h1>
+              <p>每张完整图片对应一页 PPT，尺寸统一为标准 16:9。</p>
+            </div>
+            <span class="optional-badge required">最终交付</span>
+          </div>
+
+          <div class="export-layout">
+            <article class="content-card export-card">
+              <div id="exportStateIcon" class="export-state-icon">✓</div>
+              <p class="eyebrow">EXPORT CHECK</p>
+              <h2 id="exportReadyTitle">等待生成全部页面</h2>
+              <p id="exportReadyText">
+                请先完成所有页面的图片生成，再导出完整 PPT。
+              </p>
+
+              <div class="export-stats">
+                <div><span>课件名称</span><strong id="exportDeckTitle">—</strong></div>
+                <div><span>页面数量</span><strong id="exportPageCount">0 页</strong></div>
+                <div><span>画布比例</span><strong>16:9</strong></div>
+                <div><span>页面结构</span><strong>一页一张整图</strong></div>
+              </div>
+
+              <div id="missingPagesList" class="missing-pages"></div>
+              <button id="exportPptButton" class="button primary export-button" type="button" disabled>
+                导出 16:9 PowerPoint
+                <span>↗</span>
+              </button>
+              <button id="writeCoursewareNoteButton" class="button ghost export-button" type="button">
+                用当前课件写笔记
+              </button>
+            </article>
+
+            <aside class="content-card export-note-card">
+              <div class="mini-heading">
+                <span class="mini-icon">P</span>
+                <div>
+                  <p class="eyebrow">PPTX OUTPUT</p>
+                  <h2>导出结果说明</h2>
+                </div>
+              </div>
+              <ul>
+                <li>按照页码顺序合成完整 PPT。</li>
+                <li>每页只放置一张全屏图片。</li>
+                <li>不会拉伸图片，也不会改变画面比例。</li>
+                <li>如果有缺页，系统不会导出不完整文件。</li>
+              </ul>
+              <button id="backToGenerationButton" class="button ghost" type="button">
+                返回检查生成结果
+              </button>
+            </aside>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <main id="notesWorkspace" class="tool-workspace notes-workspace workspace-panel shell" data-workspace-panel="notes" hidden>
+      <section class="tool-hero notes-hero">
+        <div>
+          <p class="eyebrow">COURSEWARE NOTE WRITER · KEYWORD LOCK</p>
+          <h1>把课件整理成小红书笔记</h1>
+          <p>从课件中提炼一个种草角度，让核心关键词自然进入标题和正文。</p>
+        </div>
+        <div class="note-hero-actions">
+          <span id="noteTextApiState" class="note-api-state">文字 API 未配置</span>
+          <button id="noteTextSettingsButton" class="button ghost" type="button">设置文字模型</button>
+        </div>
+      </section>
+
+      <ol class="tool-step-strip notes-step-strip" aria-label="笔记写作步骤">
+        <li class="active"><span>1</span><strong>导入课件</strong><small>锁定事实来源</small></li>
+        <li><span>2</span><strong>设置关键词</strong><small>限定选题方向</small></li>
+        <li><span>3</span><strong>生成笔记</strong><small>严格依据课件</small></li>
+        <li><span>4</span><strong>检查导出</strong><small>覆盖与事实核对</small></li>
+      </ol>
+
+      <div class="note-workspace-grid">
+        <section class="note-input-column" aria-label="笔记写作输入">
+          <article class="tool-control-card note-section-card">
+            <div class="tool-card-heading note-card-heading">
+              <span class="tool-index">01</span>
+              <div><h2>确定课件依据</h2><p>模型只能使用这里的内容，不调用外部资料补写。</p></div>
+            </div>
+            <div class="note-source-toolbar">
+              <label class="tool-field note-title-field" for="noteSourceTitle">
+                <span>课件名称</span>
+                <input id="noteSourceTitle" type="text" maxlength="100" placeholder="例如：小学数学五年级课件" />
+              </label>
+              <button id="noteImportCoursewareButton" class="button ghost" type="button">导入当前课件</button>
+            </div>
+            <label class="tool-field" for="noteSource">
+              <span>课件原文或产品资料 <b class="required-mark">必填</b></span>
+              <textarea id="noteSource" rows="10" maxlength="30000" placeholder="点击“导入当前课件”，或粘贴完整课件页纲、产品资料和真实说明。"></textarea>
+            </label>
+            <div class="note-field-meta"><span id="noteSourceState">至少需要 80 个字</span><strong id="noteSourceCount">0 字</strong></div>
+          </article>
+
+          <article class="tool-control-card note-section-card">
+            <div class="tool-card-heading note-card-heading">
+              <span class="tool-index">02</span>
+              <div><h2>锁定关键词方向</h2><p>核心关键词只填一个；长尾关键词选填，最多 8 个。</p></div>
+            </div>
+            <div class="note-two-column-fields">
+              <label class="tool-field" for="noteCoreKeyword">
+                <span>核心关键词 <b class="required-mark">必填</b></span>
+                <input id="noteCoreKeyword" type="text" maxlength="30" placeholder="例如：小学数学PPT课件" />
+                <small>标题和正文必须围绕这个主题，不允许换赛道。</small>
+              </label>
+              <div class="note-field-with-action">
+                <label class="tool-field" for="noteLongTailKeywords">
+                  <span>长尾关键词 <b class="optional-mark">选填 · 最多8个</b></span>
+                  <textarea id="noteLongTailKeywords" rows="6" maxlength="600" placeholder="七年级语文开学第一课&#10;初中语文衔接课件&#10;老师开学备课PPT"></textarea>
+                  <small>有明确搜索词就填写；不填也可以直接生成。</small>
+                </label>
+                <button id="suggestNoteKeywordsButton" class="button ghost note-inline-action" type="button">AI 推荐关键词</button>
+              </div>
+            </div>
+            <div class="note-field-meta"><span id="noteKeywordState">长尾关键词未填写，将只使用核心关键词</span><strong id="noteKeywordCount">0 / 8 个</strong></div>
+            <div class="constraint-lock" role="note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              <div><strong>严格依据模式已开启</strong><p>不使用外部知识；不补写课件里没有的价格、效果、销量、评价和收益承诺。</p></div>
+            </div>
+          </article>
+
+          <article class="tool-control-card note-section-card">
+            <div class="tool-card-heading note-card-heading">
+              <span class="tool-index">03</span>
+              <div><h2>设置写作要求</h2><p>只选择必要条件，复杂规则由工具自动处理。</p></div>
+            </div>
+            <div class="note-two-column-fields compact">
+              <label class="tool-field" for="noteType"><span>笔记写法</span><select id="noteType"><option value="product">课件种草推荐</option><option value="painpoint">痛点解决</option><option value="contrast">反差对比</option><option value="scenario">场景体验</option><option value="tutorial">清单干货</option><option value="case">设计复盘</option></select></label>
+              <label class="tool-field" for="noteLength"><span>正文长度</span><select id="noteLength"><option value="200-350">200–350 字 · 精简</option><option value="350-550" selected>350–550 字 · 标准</option><option value="550-700">550–700 字 · 完整</option></select></label>
+            </div>
+            <div class="note-two-column-fields compact">
+              <label class="tool-field" for="noteAudience"><span>目标读者</span><input id="noteAudience" type="text" list="noteAudienceOptions" maxlength="200" value="需要提高备课效率的一线老师" placeholder="选择或手动填写" /></label>
+              <label class="tool-field" for="noteAudiencePain"><span>读者痛点</span><input id="noteAudiencePain" type="text" list="noteAudiencePainOptions" maxlength="300" value="备课时间紧，缺少可以直接借鉴的完整思路" placeholder="选择或手动填写" /></label>
+            </div>
+            <datalist id="noteAudienceOptions">
+              <option value="需要提高备课效率的一线老师"></option><option value="刚入职缺少备课经验的新老师"></option><option value="需要准备开学第一课的班主任"></option><option value="中小学语文老师"></option><option value="中小学数学老师"></option><option value="教培机构授课老师"></option><option value="教育资料和课件创作者"></option><option value="在家辅导孩子学习的家长"></option>
+            </datalist>
+            <datalist id="noteAudiencePainOptions">
+              <option value="备课时间紧，缺少可以直接借鉴的完整思路"></option><option value="不知道第一节课应该从什么角度切入"></option><option value="资料很多但难以提炼课堂重点"></option><option value="课件内容完整但缺少设计感和记忆点"></option><option value="想提高课堂互动又不知道怎么安排"></option><option value="临时需要课件，没有时间从零制作"></option><option value="担心内容太空，学生听完没有收获"></option><option value="反复找资料耗时，希望有成套参考"></option>
+            </datalist>
+            <details class="note-advanced">
+              <summary>补充事实与禁用表达</summary>
+              <div class="note-two-column-fields">
+                <label class="tool-field" for="noteRequiredFacts"><span>必须保留的事实</span><textarea id="noteRequiredFacts" rows="4" maxlength="4000" placeholder="例如：适用年级、包含的资料、真实制作流程"></textarea></label>
+                <label class="tool-field" for="noteForbiddenClaims"><span>禁止出现的表达</span><textarea id="noteForbiddenClaims" rows="4" maxlength="2000" placeholder="例如：保证提分、保证出单、全网最好"></textarea></label>
+              </div>
+            </details>
+            <button id="generateNoteButton" class="button primary tool-wide-button note-generate-button" type="button">生成课件笔记</button>
+            <p id="noteGenerationStatus" class="tool-status" role="status" aria-live="polite">填写课件依据和核心关键词后开始生成。</p>
+          </article>
+        </section>
+
+        <section class="tool-preview-card note-result-card" aria-label="笔记生成结果">
+          <div class="tool-preview-heading note-result-heading">
+            <div><p class="eyebrow">NOTE OUTPUT · GROUNDED</p><h2>笔记成稿与约束检查</h2></div>
+            <div class="tool-export-actions">
+              <button id="noteSaveButton" class="button ghost" type="button">保存本机</button>
+              <button id="downloadNoteButton" class="button ghost" type="button">下载文本</button>
+              <button id="copyNoteButton" class="button primary" type="button">复制整篇</button>
+            </div>
+          </div>
+          <div id="noteResultEmpty" class="note-result-empty">
+            <span class="note-empty-mark" aria-hidden="true"><i></i><b></b><em></em></span>
+            <strong>还没有生成笔记</strong>
+            <p>生成后，标题、正文和标签会合并在一个文本框里，方便直接复制发布。</p>
+          </div>
+          <div id="noteResultContent" class="note-result-content" hidden>
+            <section class="note-output-section">
+              <div class="note-output-label"><strong>标题候选</strong><span>点击选择最终标题</span></div>
+              <div id="noteTitleOptions" class="note-title-options"></div>
+            </section>
+            <section class="note-output-section note-body-section">
+              <div class="note-output-label"><strong>可直接发布的文案</strong><span>第一行标题 · 中间正文 · 末尾标签</span></div>
+              <textarea id="notePublishOutput" rows="24" aria-label="标题正文和标签合并后的发布文案"></textarea>
+              <div class="note-publish-meta"><span>复制内容不会出现“标题、正文、标签”等字段前缀</span><strong id="notePublishCount">0 字</strong></div>
+            </section>
+            <div class="note-output-grid">
+              <section class="note-output-section"><div class="note-output-label"><strong>大字报文案</strong><span>突出反差价值</span></div><p id="notePosterOutput" class="note-cover-output"></p></section>
+              <section class="note-output-section"><div class="note-output-label"><strong>配图顺序</strong></div><ol id="noteImagePlan" class="note-plain-list"></ol></section>
+            </div>
+            <section class="note-output-section"><div class="note-output-label"><strong>内容依据</strong><span>人工复核区</span></div><ul id="noteFactBasis" class="note-plain-list"></ul></section>
+            <div class="note-result-actions">
+              <div class="note-result-action-buttons"><button id="reviseNoteButton" class="button ghost" type="button">按要求优化</button><button id="regenerateNoteButton" class="button primary" type="button">再生成一条</button></div>
+              <span id="noteSaveState">修改后自动保存到本机</span>
+            </div>
+          </div>
+          <div id="noteKeywordCoverage" class="keyword-coverage empty">生成后会检查核心关键词；填写了长尾关键词时再检查长尾词覆盖。</div>
+        </section>
+      </div>
+    </main>
+
+    <main id="collageWorkspace" class="tool-workspace workspace-panel shell" data-workspace-panel="collage" hidden>
+      <section class="tool-hero">
+        <div>
+          <p class="eyebrow">XIAOHONGSHU COVER COLLAGE</p>
+          <h1>把 PPT 页面拼成商品封面</h1>
+          <p>上传 16:9 PPTX，自动读取或渲染完整页面，从两种竖版 3:4 商品主图中选择适合当前课件的版式。</p>
+        </div>
+        <span class="local-only-badge">本地处理 · 不消耗 Token</span>
+      </section>
+
+      <ol class="tool-step-strip" aria-label="PPT 拼图操作步骤">
+        <li class="active"><span>1</span><strong>上传 PPTX</strong><small>渲染完整页面</small></li>
+        <li><span>2</span><strong>选择版式</strong><small>两种商品主图</small></li>
+        <li><span>3</span><strong>设置重点页</strong><small>自动排列页面</small></li>
+        <li><span>4</span><strong>导出封面</strong><small>PNG 或 JPG</small></li>
+      </ol>
+
+      <div class="tool-editor-layout collage-editor-layout">
+        <aside class="tool-control-card">
+          <div class="tool-card-heading">
+            <span class="tool-index">01</span>
+            <div><h2>选择 PPTX 文件</h2><p>支持一页一图和可编辑多图层 PPT；后者会调用本机 PowerPoint。</p></div>
+          </div>
+          <input id="collagePptInput" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
+          <button id="collagePptButton" class="tool-upload-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+            <span><strong>上传 PPTX</strong><small id="collageFileName">尚未选择文件 · 最大 180 MB</small></span>
+          </button>
+
+          <label class="tool-field" for="collagePageRange">
+            <span>提取页码范围 <i>可选</i></span>
+            <input id="collagePageRange" type="text" inputmode="numeric" placeholder="留空提取全部，如 1-12 或 1,3,6-9" />
+            <small>不填写即提取全部页面；支持连续范围和多个页码。</small>
+          </label>
+          <button id="extractPptButton" class="button primary tool-wide-button" type="button" disabled>提取 PPT 页面</button>
+          <p id="collageExtractStatus" class="tool-status" role="status" aria-live="polite">等待上传 PPTX。</p>
+
+          <div class="tool-divider"></div>
+          <div class="tool-card-heading compact">
+            <span class="tool-index">02</span>
+            <div><h2>商品主图设置</h2><p>选择版式，再指定需要重点展示的页面。</p></div>
+          </div>
+          <fieldset class="collage-template-fieldset">
+            <legend>商品主图样式</legend>
+            <div class="collage-template-options">
+              <label class="collage-template-card">
+                <input type="radio" name="collageTemplate" value="classic" checked />
+                <span class="collage-template-diagram classic" aria-hidden="true"><i></i><b></b><em></em><u></u></span>
+                <span><strong>重点三图</strong><small>左侧缩略图＋右侧三张重点图</small></span>
+              </label>
+              <label class="collage-template-card">
+                <input type="radio" name="collageTemplate" value="showcase" />
+                <span class="collage-template-diagram showcase" aria-hidden="true"><i></i><b></b><em></em><u></u></span>
+                <span><strong>主图＋课件矩阵</strong><small>顶部主视觉＋下方 3×4 课件页</small></span>
+              </label>
+            </div>
+          </fieldset>
+          <label class="tool-field" for="collageHeroPages">
+            <span id="collageHeroLabel">重点大图页码</span>
+            <input id="collageHeroPages" type="text" inputmode="numeric" placeholder="例如 1,2,3" />
+            <small id="collageHeroHelp">填写 3 个已提取页码；其余页面自动放到左侧缩略图区。</small>
+          </label>
+          <label class="tool-field" for="collageBackgroundColor">
+            <span>封面背景色</span>
+            <span class="color-field"><input id="collageBackgroundColor" type="color" value="#e9ece8" /><output id="collageColorValue">#E9ECE8</output></span>
+          </label>
+          <button id="renderCollageButton" class="button primary tool-wide-button" type="button" disabled>生成拼图预览</button>
+        </aside>
+
+        <section class="tool-preview-card">
+          <div class="tool-preview-heading">
+            <div><p class="eyebrow">PREVIEW · 1080 × 1440 · 竖版 3:4</p><h2>小红书商品封面</h2></div>
+            <div class="tool-export-actions">
+              <button id="downloadCollageJpg" class="button ghost" type="button" disabled>导出 JPG</button>
+              <button id="downloadCollagePng" class="button primary" type="button" disabled>导出 PNG</button>
+            </div>
+          </div>
+          <div class="collage-canvas-stage">
+            <canvas id="collageCanvas" width="1080" height="1440" aria-label="PPT 页面拼图预览"></canvas>
+            <div id="collageCanvasEmpty" class="canvas-empty-state">
+              <span class="empty-layout-mark" aria-hidden="true"><i></i><b></b><em></em></span>
+              <strong>提取页面后生成封面</strong>
+              <p>重点三图适合 6—14 页；主图＋课件矩阵建议至少 13 页。</p>
+            </div>
+          </div>
+          <div id="collageThumbs" class="extracted-page-list" aria-label="已提取的 PPT 页面"></div>
+        </section>
+      </div>
+    </main>
+
+    <main id="perspectiveWorkspace" class="tool-workspace workspace-panel shell" data-workspace-panel="perspective" hidden>
+      <section class="tool-hero">
+        <div>
+          <p class="eyebrow">SCENE PERSPECTIVE REPLACER</p>
+          <h1>把课件贴进真实场景</h1>
+          <p>上传教室、电脑或投影场景图，再点击屏幕四个角，课件画面会按真实透视自动贴合。图片不会上传网络。</p>
+        </div>
+        <span class="local-only-badge">本地处理 · 不消耗 Token</span>
+      </section>
+
+      <ol id="perspectiveSteps" class="tool-step-strip" aria-label="场景换图操作步骤">
+        <li class="active"><span>1</span><strong>上传场景图</strong><small>教室、电脑、投影</small></li>
+        <li><span>2</span><strong>上传替换图</strong><small>PPT 页面或商品图</small></li>
+        <li><span>3</span><strong>定位四个角</strong><small>可拖动微调</small></li>
+        <li><span>4</span><strong>导出图片</strong><small>尺寸与场景一致</small></li>
+      </ol>
+
+      <div class="tool-editor-layout perspective-editor-layout">
+        <aside class="tool-control-card perspective-controls">
+          <input id="sceneImageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          <input id="replacementImageInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
+
+          <div class="tool-card-heading">
+            <span class="tool-index">01</span>
+            <div><h2>准备场景和课件页</h2><p>场景图选一张；替换画面最多可一次上传 18 张。</p></div>
+          </div>
+          <button id="sceneImageButton" class="tool-upload-button compact-upload" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l4-4 3 3 3-4 6 7"/><circle cx="8" cy="8" r="1.5"/></svg>
+            <span><strong>上传场景背景图</strong><small id="sceneFileName">JPG / PNG / WebP</small></span>
+          </button>
+          <section class="scene-template-panel" aria-labelledby="sceneTemplateHeading">
+            <div class="scene-template-heading">
+              <div>
+                <strong id="sceneTemplateHeading">我的常用场景</strong>
+                <small>背景图与四点定位只保存在当前浏览器</small>
+              </div>
+              <span id="sceneTemplateCount" class="scene-template-count">0 / 12</span>
+            </div>
+            <div class="scene-template-save-row">
+              <label class="sr-only" for="sceneTemplateName">常用场景名称</label>
+              <input id="sceneTemplateName" type="text" maxlength="30" placeholder="例如：教室投影正面" autocomplete="off" />
+              <button id="saveSceneTemplateButton" class="button primary" type="button" disabled>保存当前场景</button>
+            </div>
+            <p id="sceneTemplateHint" class="scene-template-hint">上传背景图并完成四点定位后即可保存，最多 12 个。</p>
+            <div id="sceneTemplateList" class="scene-template-list" aria-live="polite">
+              <div class="scene-template-empty">还没有常用场景，完成一次四点定位后保存即可。</div>
+            </div>
+          </section>
+          <button id="replacementImageButton" class="tool-upload-button compact-upload" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>
+            <span><strong>批量上传替换画面</strong><small id="replacementFileName">最多 18 张 PPT 页面或商品图片</small></span>
+          </button>
+          <section id="replacementQueue" class="replacement-queue" aria-label="已上传的替换画面" hidden>
+            <div class="replacement-queue-head">
+              <div><strong id="replacementQueueCount">已选择 0 张</strong><small>最多 18 张；导出时默认一次处理全部图片</small></div>
+              <div class="replacement-nav-actions">
+                <button id="previousReplacementButton" class="button ghost" type="button" disabled aria-label="上一张替换画面">上一张</button>
+                <button id="nextReplacementButton" class="button ghost" type="button" disabled aria-label="下一张替换画面">下一张</button>
+              </div>
+            </div>
+            <div id="replacementThumbs" class="replacement-thumb-list" role="listbox" aria-label="替换画面列表"></div>
+          </section>
+
+          <div class="tool-divider"></div>
+          <div class="tool-card-heading compact">
+            <span class="tool-index">02</span>
+            <div><h2>四点定位</h2><p>依次点击左上、右上、右下、左下。</p></div>
+          </div>
+          <div class="perspective-action-grid">
+            <button id="undoPerspectiveButton" class="button ghost" type="button" disabled>撤销上一步</button>
+            <button id="resetPointsButton" class="button ghost" type="button" disabled>重新定位</button>
+          </div>
+
+          <details class="simple-settings" open>
+            <summary>画面贴合设置</summary>
+            <div class="simple-settings-body">
+              <label class="tool-field" for="perspectiveFitMode"><span>图片适配</span><select id="perspectiveFitMode"><option value="contain">完整显示</option><option value="cover">铺满屏幕</option></select></label>
+              <label class="tool-field" for="perspectiveMatteColor"><span>留边颜色</span><span class="color-field"><input id="perspectiveMatteColor" type="color" value="#000000" /><output>#000000</output></span></label>
+              <label class="range-field" for="perspectiveOpacity"><span>透明度 <output id="perspectiveOpacityValue">100%</output></span><input id="perspectiveOpacity" type="range" min="0" max="100" value="100" /></label>
+              <label class="range-field" for="perspectiveBrightness"><span>亮度 <output id="perspectiveBrightnessValue">100%</output></span><input id="perspectiveBrightness" type="range" min="50" max="150" value="100" /></label>
+              <label class="range-field" for="perspectiveFeather"><span>边缘羽化 <output id="perspectiveFeatherValue">0 px</output></span><input id="perspectiveFeather" type="range" min="0" max="10" value="0" /></label>
+            </div>
+          </details>
+
+          <p id="perspectiveStatus" class="tool-status" role="status" aria-live="polite">请先上传场景背景图。</p>
+          <div class="perspective-export-grid">
+            <button id="exportPerspectiveJpg" class="button ghost" type="button" disabled>导出 JPG</button>
+            <button id="exportPerspectivePng" class="button primary" type="button" disabled>导出 PNG</button>
+          </div>
+          <button id="restartPerspectiveButton" class="button text-button danger-text tool-wide-button" type="button">重新开始</button>
+        </aside>
+
+        <section class="tool-preview-card perspective-preview-card">
+          <div class="tool-preview-heading">
+            <div><p class="eyebrow">LIVE PREVIEW</p><h2>实时透视预览</h2></div>
+            <span id="perspectiveResolution" class="resolution-label">尚未上传场景图</span>
+          </div>
+          <div id="perspectiveCanvasStage" class="perspective-canvas-stage">
+            <canvas id="perspectiveCanvas" width="1200" height="675" aria-label="场景透视换图预览"></canvas>
+            <div id="perspectiveCanvasEmpty" class="canvas-empty-state">
+              <span class="screen-corner-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <strong>上传场景图开始</strong>
+              <p>图片只在当前浏览器处理，不会上传网络。</p>
+            </div>
+          </div>
+          <p class="canvas-help">完成四点后可直接拖动编号手柄微调；导出图不会包含编号和边界线。</p>
+        </section>
+      </div>
+    </main>
+
+    <footer id="coursewareFooter" class="wizard-footer workspace-panel" data-workspace-panel="courseware">
+      <button id="saveDraftButton" class="button ghost" type="button">
+        保存当前草稿
+      </button>
+      <div class="footer-step">
+        <span id="currentStepLabel">步骤 1 / 5</span>
+        <small id="currentStepHint">填写并识别整套页纲内容</small>
+      </div>
+      <div class="footer-actions">
+        <button id="previousStepButton" class="button ghost large" type="button" disabled>
+          ← 上一步
+        </button>
+        <button id="nextStepButton" class="button primary large" type="button">
+          下一步：参考图片
+          <span>→</span>
+        </button>
+      </div>
+    </footer>
+
+    <dialog
+      id="apiDialog"
+      class="api-dialog"
+      aria-labelledby="apiDialogTitle"
+      aria-describedby="apiDialogDescription"
+    >
+      <div class="dialog-shell">
+        <header class="dialog-head">
+          <div class="dialog-title-group">
+            <div class="dialog-mark" aria-hidden="true">API</div>
+            <div>
+              <p class="eyebrow">SECURE CONNECTION</p>
+              <h2 id="apiDialogTitle">连接图片生成服务</h2>
+              <p id="apiDialogDescription">
+                填写自己的接口信息。保存后长期保留在当前电脑，不会写入方案或 PPT。
+              </p>
+            </div>
+          </div>
+          <button id="closeApiDialog" class="close-button" type="button" aria-label="关闭接口设置">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <div class="dialog-content">
+          <section class="settings-section" aria-labelledby="basicSettingsTitle">
+            <div class="section-heading">
+              <div>
+                <span class="section-index">01</span>
+                <div>
+                  <h3 id="basicSettingsTitle">基础连接信息</h3>
+                  <p>通常只需要填写 API 地址和 API Key。</p>
+                </div>
+              </div>
+              <span class="required-pill">必填</span>
+            </div>
+
+            <div class="field field-wide">
+              <label for="imageProvider">接口类型 <b>必填</b></label>
+              <select id="imageProvider">
+                <option value="wukong">悟空 API · 生图组</option>
+                <option value="volcengine-seedream">火山方舟 · 豆包 Seedream 生图</option>
+                <option value="custom">其他兼容图片 API</option>
+              </select>
+              <small id="imageProviderHelp">选择服务商后，工具会自动填写正确的图片接口路径。</small>
+            </div>
+
+            <div class="field field-wide">
+              <label for="endpoint">API 服务地址 <b>必填</b></label>
+              <input
+                id="endpoint"
+                type="url"
+                autocomplete="url"
+                placeholder="悟空API：https://wkapi.work"
+              />
+              <small id="endpointHelp">支持以 /v1 结尾的 Base URL，系统会自动补全图片生成路径。</small>
+            </div>
+
+            <div class="basic-grid">
+              <div class="field field-wide">
+                <label for="apiKey">API Key <b>必填</b></label>
+                <div class="password-control">
+                  <input
+                    id="apiKey"
+                    type="password"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="粘贴你的 API Key"
+                  />
+                  <button id="toggleApiKey" type="button" aria-label="显示 API Key" aria-pressed="false">
+                    显示
+                  </button>
+                </div>
+                <small>保存后会留在当前浏览器，下次打开无需重填；不会进入分享方案或 PPT。</small>
+              </div>
+
+              <div class="field field-wide" id="seedreamModelField" hidden>
+                <label for="seedreamModelPreset">豆包图片模型 <b>必填</b></label>
+                <select id="seedreamModelPreset">
+                  <option value="doubao-seedream-5-0-lite-260128">Seedream 5.0 Lite · 推荐</option>
+                  <option value="doubao-seedream-5-0-260128">Seedream 5.0</option>
+                  <option value="doubao-seedream-4-5-251128">Seedream 4.5</option>
+                  <option value="doubao-seedream-4-0-250828">Seedream 4.0</option>
+                  <option value="custom">自定义图片模型 ID / Endpoint ID</option>
+                </select>
+                <input
+                  id="seedreamCustomModel"
+                  type="text"
+                  spellcheck="false"
+                  placeholder="例如 doubao-seedream-... 或 ep-..."
+                  hidden
+                />
+                <small>这里只提供 Seedream 图片模型；Seedance 视频模型不会显示，也不会被调用。</small>
+              </div>
+            </div>
+
+            <div class="auto-config-note" role="note">
+              <span class="auto-config-icon" aria-hidden="true">✓</span>
+              <div>
+                <strong id="autoConfigTitle">普通使用只需填写以上两项</strong>
+                <p id="autoConfigMessage">检测地址、图片生成地址、参考图接口和网络代理均由系统自动判断。</p>
+              </div>
+            </div>
+            <div class="local-save-note" role="note">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="5" y="10" width="14" height="10" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+              <div>
+                <strong>本机长期保存</strong>
+                <p>API 地址与 Key 仅保存在当前浏览器；清除浏览器数据或点击“清除本机配置”后移除。</p>
+              </div>
+            </div>
+          </section>
+
+          <details class="advanced settings-section">
+            <summary>
+              <span class="advanced-title">
+                <span class="section-index">02</span>
+                <span>
+                  <strong>高级设置</strong>
+                  <small>系统已自动处理，通常不需要打开</small>
+                </span>
+              </span>
+              <span class="summary-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="advanced-body form-grid">
+              <div class="field" id="modelField">
+                <label id="modelLabel" for="model">模型名称</label>
+                <input
+                  id="model"
+                  type="text"
+                  value="gpt-image-2"
+                  spellcheck="false"
+                  placeholder="填写接口要求的模型名"
+                />
+                <small id="modelHelp">默认使用 GPT Image 2，一般不需要修改。</small>
+              </div>
+
+              <div class="field" id="sizeField">
+                <label id="sizeLabel" for="size">画面尺寸</label>
+                <input id="size" type="text" value="2048x1152" spellcheck="false" />
+                <small id="sizeHelp">标准 16:9 横版，适合整页 PPT。</small>
+              </div>
+
+              <div class="field" id="qualityField">
+                <label for="quality">生成质量</label>
+                <select id="quality">
+                  <option value="high">高质量 · high</option>
+                  <option value="medium">标准 · medium</option>
+                  <option value="low">快速 · low</option>
+                  <option value="">由接口自动决定</option>
+                </select>
+                <small>建议先使用高质量，接口不支持时再调整。</small>
+              </div>
+
+              <div class="field field-wide">
+                <label for="proxyUrl">网络代理</label>
+                <input
+                  id="proxyUrl"
+                  type="text"
+                  inputmode="url"
+                  spellcheck="false"
+                  placeholder="留空自动读取系统代理，例如 http://127.0.0.1:7897"
+                />
+                <small id="proxyStatus">留空时自动读取 Windows 或 macOS 当前系统代理。</small>
+              </div>
+
+              <div class="field" id="testEndpointField">
+                <label for="testEndpoint">连接检测地址</label>
+                <input id="testEndpoint" type="url" placeholder="留空自动检测 /v1/models" />
+                <small>留空即可自动检测；更换服务商时旧地址会自动清除。</small>
+              </div>
+
+              <div class="field" id="editEndpointField">
+                <label for="editEndpoint">参考图编辑地址</label>
+                <input
+                  id="editEndpoint"
+                  type="url"
+                  placeholder="留空自动使用 /images/edits"
+                />
+                <small>只有参考图接口路径不同才需要填写。</small>
+              </div>
+
+              <div class="field">
+                <label for="extraBody">额外请求参数 <span>JSON</span></label>
+                <textarea id="extraBody" rows="3" spellcheck="false" placeholder='{"background":"opaque"}'></textarea>
+              </div>
+
+              <div class="field">
+                <label for="extraHeaders">额外请求头 <span>JSON</span></label>
+                <textarea id="extraHeaders" rows="3" spellcheck="false" placeholder='{"X-Provider-Key":"..."}'></textarea>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <footer class="dialog-footer">
+          <div
+            id="connectionTestResult"
+            class="test-result neutral"
+            role="status"
+            aria-live="polite"
+          >
+            填写完成后，请先检测连接
+          </div>
+          <div class="dialog-actions">
+            <button id="clearApiSettingsButton" class="button text-button danger-text" type="button">
+              清除本机配置
+            </button>
+            <button id="testConnectionButton" class="button ghost" type="button">
+              检测连接
+            </button>
+            <button id="saveApiSettingsButton" class="button primary" type="button">
+              保存设置
+            </button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog
+      id="archiveDialog"
+      class="archive-dialog"
+      aria-labelledby="archiveDialogTitle"
+      aria-describedby="archiveDialogDescription"
+    >
+      <div class="archive-shell">
+        <header class="archive-head">
+          <div class="archive-title-group">
+            <div class="archive-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v14l-7-3-7 3z" />
+              </svg>
+            </div>
+            <div>
+              <p class="eyebrow">COURSEWARE TIME CAPSULE</p>
+              <h2 id="archiveDialogTitle">课件时光舱</h2>
+              <p id="archiveDialogDescription">
+                生成结果自动保存在这台电脑，随时恢复课件或重新下载 PPT。
+              </p>
+            </div>
+          </div>
+          <button id="closeArchiveDialog" class="close-button" type="button" aria-label="关闭课件时光舱">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <section class="archive-overview" aria-label="本机存档概况">
+          <div>
+            <span>本机作品</span>
+            <strong id="archiveTotalCount">0 份</strong>
+          </div>
+          <p>
+            每生成成功一页就会自动更新存档。重新下载只在本地合成，不调用图片 API。
+          </p>
+        </section>
+
+        <div id="archiveListStatus" class="archive-list-status" role="status" aria-live="polite">
+          正在读取本机作品…
+        </div>
+        <section id="archiveList" class="archive-list" aria-label="已保存的课件作品"></section>
+        <section id="archiveEmpty" class="archive-empty" hidden>
+          <div class="archive-empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v14l-7-3-7 3z" /></svg>
+          </div>
+          <strong>时光舱还是空的</strong>
+          <p>开始生成课件后，成功的页面会自动保存在这里。</p>
+        </section>
+
+        <footer class="archive-footer">
+          <p>存档仅保存在当前浏览器。更换电脑、浏览器或清除浏览器数据后无法读取。</p>
+          <button id="archiveCloseButton" class="button ghost" type="button">完成</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog id="textApiDialog" class="api-dialog" aria-labelledby="textApiDialogTitle" aria-describedby="textApiDialogDescription">
+      <div class="dialog-shell text-api-dialog-shell">
+        <header class="dialog-head">
+          <div class="dialog-title-group">
+            <div class="dialog-mark" aria-hidden="true">AI</div>
+            <div>
+              <p class="eyebrow">TEXT MODEL CONNECTION</p>
+              <h2 id="textApiDialogTitle">连接文字处理模型</h2>
+              <p id="textApiDialogDescription">用于标题、正文和局部修订。配置只保存在当前浏览器，不进入笔记或分享包。</p>
+            </div>
+          </div>
+          <button id="closeTextApiDialog" class="close-button" type="button" aria-label="关闭文字接口设置"><span aria-hidden="true">×</span></button>
+        </header>
+        <div class="dialog-content">
+          <section class="settings-section" aria-labelledby="textApiBasicTitle">
+            <div class="section-heading">
+              <span class="section-index">01</span>
+              <div><h3 id="textApiBasicTitle">基础连接信息</h3><p>填写自己的文字模型接口，工具不会内置作者的 API。</p></div>
+              <span class="required-pill">必填</span>
+            </div>
+            <div class="provider-preset" role="note">
+              <div>
+                <strong>优先推荐：DeepSeek</strong>
+                <p>一键填写官方地址和适合笔记写作的 deepseek-v4-flash；你只需粘贴自己的 API Key。</p>
+              </div>
+              <button id="textApiDeepSeekPreset" class="button ghost" type="button">一键填写 DeepSeek</button>
+            </div>
+            <div class="form-grid">
+              <div class="field field-wide">
+                <label for="textApiEndpoint">API 地址</label>
+                <input id="textApiEndpoint" type="url" inputmode="url" spellcheck="false" placeholder="DeepSeek：https://api.deepseek.com" />
+                <small>DeepSeek 填官方 Base URL 即可，工具会自动使用 /chat/completions；其他兼容服务仍支持 Responses。</small>
+              </div>
+              <div class="field">
+                <label for="textApiModel">模型名称</label>
+                <input id="textApiModel" type="text" spellcheck="false" placeholder="DeepSeek 推荐 deepseek-v4-flash" />
+                <small>DeepSeek 笔记优先用 deepseek-v4-flash；旧模型名会提示升级。</small>
+              </div>
+              <div class="field">
+                <label for="textApiKey">API Key</label>
+                <div class="secret-input"><input id="textApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴自己的 API Key" /><button id="toggleTextApiKey" type="button" aria-label="显示文字 API Key">显示</button></div>
+                <small>仅保存在当前浏览器，并通过本机服务发送到所填接口。</small>
+              </div>
+            </div>
+            <div class="local-save-note" role="note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              <div><strong>图片接口与文字接口相互独立</strong><p>可以使用不同服务商、不同 Key 和不同模型；更换服务商时旧 Key 会自动清除。</p></div>
+            </div>
+          </section>
+          <details class="advanced settings-section">
+            <summary><span class="advanced-title"><span class="section-index">02</span><span><strong>高级设置</strong><small>兼容特殊服务商时再打开</small></span></span><span class="summary-chevron" aria-hidden="true"></span></summary>
+            <div class="advanced-body form-grid">
+              <div class="field"><label for="textApiProtocol">接口协议</label><select id="textApiProtocol"><option value="auto">自动识别（DeepSeek 自动走 Chat）</option><option value="responses">Responses API</option><option value="chat">Chat Completions</option></select></div>
+              <div class="field"><label for="textApiProxyUrl">网络代理</label><input id="textApiProxyUrl" type="text" spellcheck="false" placeholder="留空自动读取系统代理" /></div>
+              <div class="field"><label for="textApiExtraBody">额外请求参数 <span>JSON</span></label><textarea id="textApiExtraBody" rows="3" spellcheck="false" placeholder='{"temperature":0.5}'></textarea></div>
+              <div class="field"><label for="textApiExtraHeaders">额外请求头 <span>JSON</span></label><textarea id="textApiExtraHeaders" rows="3" spellcheck="false" placeholder='{"X-Provider-Key":"..."}'></textarea></div>
+            </div>
+          </details>
+        </div>
+        <footer class="dialog-footer">
+          <div id="textApiTestResult" class="test-result neutral" role="status" aria-live="polite">填写完成后，请先检测文字模型连接</div>
+          <div class="dialog-actions">
+            <button id="clearTextApiButton" class="button text-button danger-text" type="button">清除本机配置</button>
+            <button id="testTextApiButton" class="button ghost" type="button">检测连接</button>
+            <button id="saveTextApiButton" class="button primary" type="button">保存设置</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <template id="slideTemplate">
+      <article class="slide-card">
+        <div class="slide-preview">
+          <div class="preview-placeholder">
+            <span class="preview-page"></span>
+            <strong>等待生成</strong>
+          </div>
+          <img alt="生成的 PPT 页面预览" />
+          <div class="preview-status"></div>
+        </div>
+        <div class="slide-meta">
+          <div>
+            <span class="slide-number"></span>
+            <h3 class="slide-title"></h3>
+          </div>
+        </div>
+        <p class="slide-excerpt"></p>
+        <p class="slide-direction"></p>
+        <p class="slide-error" role="alert"></p>
+        <div class="slide-actions">
+          <span class="retry-note">只生成这一页，不影响其他页面</span>
+          <button class="retry-button" type="button">生成这一页</button>
+        </div>
+      </article>
+    </template>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js?v=20260815-wukong-proxy-fallback-v1"></script>
+    <script type="module" src="/note-tool.js?v=20260811-seeding-notes-v3"></script>
+    <script type="module" src="/tools.js?v=20260812-scene-template-library-v1"></script>
+  </body>
+</html>

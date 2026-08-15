@@ -1,0 +1,17 @@
+苹果电脑无法打开时，请按下面步骤操作
+====================================
+
+1. 在安全提示中点击“完成”，不要点击“移到废纸篓”。
+2. 打开 macOS 的“终端”。
+3. 完整复制下面这一整行命令，粘贴到终端后按回车：
+
+TOOL_DIR="$(osascript -e 'POSIX path of (choose folder with prompt "请选择解压后的mini航海工具文件夹")')" && LAUNCHER="${TOOL_DIR%/}/苹果系统点这里运行软件.command" && xattr -dr com.apple.quarantine "$TOOL_DIR" && chmod +x "$LAUNCHER" && open "$LAUNCHER"
+
+4. 系统会弹出文件夹选择窗口。请选择“解压后的整个工具箱文件夹”，然后点击“选取”。
+5. 命令会自动解除安全隔离、添加执行权限并启动软件。
+
+注意：
+- 不要只输入 xattr -dr com.apple.quarantine；后面没有文件夹路径时不会生效，并会提示 Expected at least 2 but got 1。
+- 必须先完整解压压缩包，不能在压缩包预览窗口中运行。
+- 如果随后提示没有 Node.js，请从 https://nodejs.org/ 安装 Node.js 20 或更高版本。
+- 仍然失败时，请把终端最后几行完整截图发给工具提供者。

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>苹果电脑首次使用说明</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #183f38;
+      background: #eaf7f3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 32px 18px 56px;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(98, 205, 180, .28), transparent 38%),
+        linear-gradient(180deg, #f7fffc 0%, #e8f5f1 100%);
+    }
+    main { width: min(820px, 100%); margin: 0 auto; }
+    .brand { margin-bottom: 18px; font-size: 18px; font-weight: 800; color: #296e63; }
+    .card {
+      padding: clamp(24px, 5vw, 44px);
+      border: 1px solid rgba(47, 119, 107, .18);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 22px 60px rgba(35, 95, 84, .12);
+    }
+    h1 { margin: 0 0 12px; font-size: clamp(28px, 5vw, 42px); line-height: 1.2; }
+    .lead { margin: 0 0 28px; color: #58736d; font-size: 18px; line-height: 1.8; }
+    .notice {
+      margin: 0 0 28px;
+      padding: 16px 18px;
+      border-left: 5px solid #e49c34;
+      border-radius: 12px;
+      background: #fff7e8;
+      color: #76511f;
+      font-size: 17px;
+      line-height: 1.7;
+    }
+    h2 { margin: 32px 0 12px; font-size: 23px; }
+    ol { margin: 0; padding-left: 26px; }
+    li { margin: 10px 0; padding-left: 4px; font-size: 17px; line-height: 1.75; }
+    code {
+      display: block;
+      overflow-x: auto;
+      margin: 14px 0 10px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #173e37;
+      color: #f2fffb;
+      font: 15px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      white-space: pre;
+    }
+    .copy-button, .node-link {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 12px;
+      background: #2f776b;
+      color: white;
+      font: inherit;
+      font-weight: 750;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .copy-button:focus-visible, .node-link:focus-visible { outline: 3px solid #8ddac9; outline-offset: 3px; }
+    .help { margin-top: 30px; padding-top: 22px; border-top: 1px solid #dceae6; color: #5e756f; line-height: 1.8; }
+    strong { color: #204f47; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">生财有术 · mini航海</div>
+    <section class="card">
+      <h1>苹果电脑首次打开说明</h1>
+      <p class="lead">如果双击启动文件后出现“Apple 无法验证是否包含恶意软件”，请按下面步骤处理。只需要首次设置一次。</p>
+
+      <div class="notice"><strong>先点“完成”，不要点“移到废纸篓”。</strong><br />这是 macOS 对从网络下载、没有苹果开发者签名的本地脚本进行的常规拦截，不代表图片接口出错。</div>
+
+      <h2>方法一：在系统设置中允许打开</h2>
+      <ol>
+        <li>打开苹果菜单里的<strong>系统设置</strong>。</li>
+        <li>进入<strong>隐私与安全性</strong>，向下滚动到“安全性”。</li>
+        <li>找到刚才被阻止的“苹果系统点这里运行软件.command”，点击<strong>仍要打开</strong>。</li>
+        <li>输入电脑登录密码并确认，然后重新双击启动文件。</li>
+      </ol>
+
+      <h2>方法二：没有“仍要打开”时</h2>
+      <ol>
+        <li>打开 macOS 的<strong>终端</strong>。</li>
+        <li>完整复制下面这一整行命令，粘贴到终端后按回车：</li>
+      </ol>
+      <code id="quarantineCommand">TOOL_DIR="$(osascript -e 'POSIX path of (choose folder with prompt "请选择解压后的mini航海工具文件夹")')" &amp;&amp; LAUNCHER="${TOOL_DIR%/}/苹果系统点这里运行软件.command" &amp;&amp; xattr -dr com.apple.quarantine "$TOOL_DIR" &amp;&amp; chmod +x "$LAUNCHER" &amp;&amp; open "$LAUNCHER"</code>
+      <button class="copy-button" type="button" data-copy="quarantineCommand">复制一键修复命令</button>
+      <ol start="3">
+        <li>系统会弹出文件夹选择窗口。请选择<strong>解压后的整个工具箱文件夹</strong>，然后点击“选取”。</li>
+        <li>命令会自动解除隔离、添加执行权限并启动软件，不需要再手动拖入路径。</li>
+      </ol>
+
+      <h2>刚才为什么会提示参数不足？</h2>
+      <p class="lead">如果只输入 <strong>xattr -dr com.apple.quarantine</strong>，后面没有文件夹路径，终端会提示“Expected at least 2 but got 1”。这表示命令没有执行成功。请使用上面完整的一键修复命令。</p>
+
+      <h2>一键命令仍提示没有执行权限时</h2>
+      <ol>
+        <li>在终端粘贴下面命令，末尾同样保留一个空格。</li>
+        <li>把“苹果系统点这里运行软件.command”文件拖进终端，然后按回车。</li>
+      </ol>
+      <code id="chmodCommand">chmod +x </code>
+      <button class="copy-button" type="button" data-copy="chmodCommand">复制权限命令</button>
+
+      <h2>启动前还需要</h2>
+      <p class="lead">电脑需要安装 Node.js 20 或更高版本。安装后再双击启动文件，首次运行会自动安装公开依赖。</p>
+      <a class="node-link" href="https://nodejs.org/" target="_blank" rel="noreferrer">打开 Node.js 官方网站</a>
+
+      <p class="help">运行成功后会自动打开浏览器。使用期间请保留终端窗口；关闭终端窗口，本地工具也会停止。仍无法启动时，请把终端窗口最后几行文字截图发给工具提供者。</p>
+    </section>
+  </main>
+  <script>
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const text = document.getElementById(button.dataset.copy).textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const input = document.createElement("textarea");
+          input.value = text;
+          input.style.position = "fixed";
+          input.style.opacity = "0";
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand("copy");
+          input.remove();
+        }
+        const original = button.textContent;
+        button.textContent = "已复制";
+        window.setTimeout(() => { button.textContent = original; }, 1600);
+      });
+    });
+  </script>
+</body>
+</html>
