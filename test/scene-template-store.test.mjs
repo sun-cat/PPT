@@ -37,3 +37,10 @@ test("模板保存背景图 四点定位和画面贴合设置", () => {
   assert.match(tools, /applySceneTemplateOptions/);
   assert.match(tools, /window\.confirm/);
 });
+
+test("旧模板会迁移为不黑边也不裁切的完整贴满模式", () => {
+  assert.match(html, /value="warp" selected>完整贴满（推荐，不裁切）/);
+  assert.match(tools, /fitModeVersion: 3/);
+  assert.match(tools, /legacyFitMigrated/);
+  assert.match(tools, /自动切换为“完整贴满”/);
+});

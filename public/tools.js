@@ -1,13 +1,17 @@
 import {
   affineFromTriangles,
   computeCollageLayout,
+  computeImageFitRect,
   computeShowcaseCollageLayout,
+  computePerspectiveRasterSize,
   computeUnitSquareHomography,
   estimateQuadAspect,
+  expandTriangleForOverlap,
   parseFeaturedPageNumbers,
   projectUnitPoint,
+  resolvePerspectiveRasterAspect,
   validatePerspectiveQuad,
-} from "/image-tool-math.js?v=20260812-collage-two-layouts-fix1";
+} from "/image-tool-math.js?v=20260818-perspective-full-migration1";
 import { createStoredZip } from "/zip-store.js?v=20260810-batch-export";
 import {
   MAX_SCENE_TEMPLATES,
@@ -558,6 +562,7 @@ const perspective = {
 function perspectiveOptions() {
   return {
     fitMode: perspective.fitMode.value,
+    fitModeVersion: 3,
     matteColor: perspective.matteColor.value,
     opacity: Number(perspective.opacity.value) / 100,
     brightness: Number(perspective.brightness.value) / 100,
@@ -723,7 +728,11 @@ async function createSceneTemplateThumbnail(image) {
 }
 
 function applySceneTemplateOptions(options = {}) {
-  perspective.fitMode.value = options.fitMode === "cover" ? "cover" : "contain";
+  const requestedMode = ["warp", "contain", "cover"].includes(options.fitMode)
+    ? options.fitMode
+    : "warp";
+  const legacyFitMigrated = Number(options.fitModeVersion || 0) < 3 && requestedMode !== "warp";
+  perspective.fitMode.value = legacyFitMigrated ? "warp" : requestedMode;
   perspective.matteColor.value = /^#[0-9a-f]{6}$/i.test(options.matteColor || "")
     ? options.matteColor
     : "#000000";
@@ -735,6 +744,7 @@ function applySceneTemplateOptions(options = {}) {
   perspective.featherValue.textContent = `${perspective.feather.value} px`;
   const colorOutput = perspective.matteColor.closest(".color-field")?.querySelector("output");
   if (colorOutput) colorOutput.textContent = perspective.matteColor.value.toUpperCase();
+  return legacyFitMigrated;
 }
 
 async function saveCurrentSceneTemplate() {
@@ -827,11 +837,16 @@ async function useSceneTemplate(id) {
     perspective.templateName.value = template.name;
     perspective.sceneName.textContent = `${template.name} · ${image.naturalWidth}×${image.naturalHeight}`;
     perspective.empty.hidden = true;
-    applySceneTemplateOptions(template.options);
+    const legacyFitMigrated = applySceneTemplateOptions(template.options);
     configurePerspectiveCanvas();
     renderSceneTemplates();
     redrawPerspective();
-    setSceneTemplateHint("已恢复背景图、四点定位和画面贴合设置。", "success");
+    setSceneTemplateHint(
+      legacyFitMigrated
+        ? "已恢复场景，并自动切换为“完整贴满”，避免旧模板出现黑边或裁掉课件内容。"
+        : "已恢复背景图、四点定位和画面贴合设置。",
+      "success",
+    );
     setStatus(
       perspective.status,
       "success",
@@ -1089,38 +1104,39 @@ function configurePerspectiveCanvas() {
 function prepareReplacementCanvas(
   aspect,
   options,
-  exportScale = 1,
+  targetWidth,
+  targetHeight,
   source = perspectiveState.replacementImage,
 ) {
-  const width = Math.max(480, Math.min(1800, Math.round(1100 * exportScale)));
-  const height = Math.max(240, Math.min(1800, Math.round(width / aspect)));
+  const { width: sourceWidth, height: sourceHeight } = imageDimensions(source);
+  const rasterAspect = resolvePerspectiveRasterAspect(
+    sourceWidth,
+    sourceHeight,
+    aspect,
+    options.fitMode,
+  );
+  const { width, height } = computePerspectiveRasterSize(rasterAspect, targetWidth, targetHeight);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
   context.fillStyle = options.matteColor;
   context.fillRect(0, 0, width, height);
-  const { width: sourceWidth, height: sourceHeight } = imageDimensions(source);
-  const sourceRatio = sourceWidth / sourceHeight;
-  const targetRatio = width / height;
-  let drawWidth;
-  let drawHeight;
-  let drawX;
-  let drawY;
-  if ((options.fitMode === "cover" && sourceRatio > targetRatio) ||
-      (options.fitMode === "contain" && sourceRatio < targetRatio)) {
-    drawHeight = height;
-    drawWidth = height * sourceRatio;
-    drawX = (width - drawWidth) / 2;
-    drawY = 0;
-  } else {
-    drawWidth = width;
-    drawHeight = width / sourceRatio;
-    drawX = 0;
-    drawY = (height - drawHeight) / 2;
-  }
   context.filter = `brightness(${options.brightness})`;
-  context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+  if (options.fitMode === "warp") {
+    context.drawImage(source, 0, 0, width, height);
+  } else {
+    const fit = computeImageFitRect(
+      sourceWidth,
+      sourceHeight,
+      width,
+      height,
+      options.fitMode,
+    );
+    context.drawImage(source, fit.x, fit.y, fit.width, fit.height);
+  }
   context.filter = "none";
   return canvas;
 }
@@ -1128,11 +1144,12 @@ function prepareReplacementCanvas(
 function drawWarpTriangle(context, sourceCanvas, sourcePoints, destinationPoints) {
   const affine = affineFromTriangles(sourcePoints, destinationPoints);
   if (!affine) return;
+  const clipPoints = expandTriangleForOverlap(destinationPoints);
   context.save();
   context.beginPath();
-  context.moveTo(destinationPoints[0].x, destinationPoints[0].y);
-  context.lineTo(destinationPoints[1].x, destinationPoints[1].y);
-  context.lineTo(destinationPoints[2].x, destinationPoints[2].y);
+  context.moveTo(clipPoints[0].x, clipPoints[0].y);
+  context.lineTo(clipPoints[1].x, clipPoints[1].y);
+  context.lineTo(clipPoints[2].x, clipPoints[2].y);
   context.closePath();
   context.clip();
   context.setTransform(affine.a, affine.b, affine.c, affine.d, affine.e, affine.f);
@@ -1172,6 +1189,14 @@ function polygonPath(context, points) {
   context.closePath();
 }
 
+function quadPixelExtent(points) {
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  return {
+    width: Math.max(distance(points[0], points[1]), distance(points[3], points[2])),
+    height: Math.max(distance(points[0], points[3]), distance(points[1], points[2])),
+  };
+}
+
 function renderPerspective(
   width,
   height,
@@ -1181,6 +1206,8 @@ function renderPerspective(
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
   const background = perspectiveState.backgroundImage;
   context.drawImage(background, 0, 0, width, height);
   const points = perspectiveState.points.map((point) => ({ x: point.x * width, y: point.y * height }));
@@ -1189,33 +1216,37 @@ function renderPerspective(
   if (replacementImage && points.length === 4 && validation.valid) {
     const options = perspectiveOptions();
     const aspect = estimateQuadAspect(perspectiveState.points, width, height);
+    const targetExtent = quadPixelExtent(points);
     const prepared = prepareReplacementCanvas(
       aspect,
       options,
-      width / Math.max(1, perspective.canvas.width),
+      targetExtent.width,
+      targetExtent.height,
       replacementImage,
     );
     const warped = document.createElement("canvas");
     warped.width = width;
     warped.height = height;
     const warpedContext = warped.getContext("2d");
+    warpedContext.imageSmoothingEnabled = true;
+    warpedContext.imageSmoothingQuality = "high";
     warpImageMesh(warpedContext, prepared, points, divisions);
 
+    const mask = document.createElement("canvas");
+    mask.width = width;
+    mask.height = height;
+    const maskContext = mask.getContext("2d");
     if (options.feather > 0) {
-      const mask = document.createElement("canvas");
-      mask.width = width;
-      mask.height = height;
-      const maskContext = mask.getContext("2d");
       const featherScale = width / perspectiveState.backgroundImage.naturalWidth;
       maskContext.filter = `blur(${Math.max(0.1, options.feather * featherScale)}px)`;
-      maskContext.fillStyle = "#fff";
-      polygonPath(maskContext, points);
-      maskContext.fill();
-      maskContext.filter = "none";
-      warpedContext.globalCompositeOperation = "destination-in";
-      warpedContext.drawImage(mask, 0, 0);
-      warpedContext.globalCompositeOperation = "source-over";
     }
+    maskContext.fillStyle = "#fff";
+    polygonPath(maskContext, points);
+    maskContext.fill();
+    maskContext.filter = "none";
+    warpedContext.globalCompositeOperation = "destination-in";
+    warpedContext.drawImage(mask, 0, 0);
+    warpedContext.globalCompositeOperation = "source-over";
     context.save();
     context.globalAlpha = options.opacity;
     context.drawImage(warped, 0, 0);
@@ -1456,6 +1487,14 @@ for (const input of [
     perspective.featherValue.textContent = `${perspective.feather.value} px`;
     const colorOutput = perspective.matteColor.closest(".color-field")?.querySelector("output");
     if (colorOutput) colorOutput.textContent = perspective.matteColor.value.toUpperCase();
+    if (input === perspective.fitMode) {
+      const fitMessages = {
+        warp: "已将完整画面贴满四点区域，不会出现黑边，也不会裁掉左右内容。",
+        cover: "已使用裁切铺满；画面边缘可能被裁掉。",
+        contain: "已完整显示画面；比例不一致时可能出现留边。",
+      };
+      setStatus(perspective.status, "success", fitMessages[perspective.fitMode.value]);
+    }
     redrawPerspective();
   });
 }

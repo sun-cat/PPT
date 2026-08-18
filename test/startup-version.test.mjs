@@ -45,8 +45,8 @@ test("笔记模块使用独立缓存版本，避免新页面加载旧脚本", ()
 
 test("本地图片工具使用新版缓存标记，避免学员继续加载旧功能", () => {
   const tools = fs.readFileSync("public/tools.js", "utf8");
-  assert.match(html, /tools\.js\?v=20260812-scene-template-library-v1/);
-  assert.match(tools, /image-tool-math\.js\?v=20260812-collage-two-layouts-fix1/);
+  assert.match(html, /tools\.js\?v=20260818-perspective-full-migration1/);
+  assert.match(tools, /image-tool-math\.js\?v=20260818-perspective-full-migration1/);
   assert.match(tools, /scene-template-store\.js\?v=20260812-scene-template-library-v1/);
 });
 
@@ -54,4 +54,39 @@ test("商品主图提供两种可访问的版式选项", () => {
   assert.match(html, /name="collageTemplate" value="classic" checked/);
   assert.match(html, /name="collageTemplate" value="showcase"/);
   assert.match(html, /顶部主视觉＋下方 3×4 课件页/);
+});
+
+test("悟空生图可选择具体 product_id 并限制安全并发", () => {
+  const app = fs.readFileSync("public/app.js", "utf8");
+  const queue = fs.readFileSync("public/generation-queue.js", "utf8");
+  assert.match(html, /id="wukongProduct"/);
+  assert.match(html, /image_nanoBanana2/);
+  assert.match(html, /image_gptImage2/);
+  assert.match(html, /image_nanoBanana_pro/);
+  assert.match(app, /existingWukongTask: slide\.pendingTask/);
+  assert.match(app, /继续取回结果/);
+  assert.match(queue, /fallback = 2/);
+});
+
+test("悟空双推荐与计费估算免责声明清晰展示", () => {
+  const app = fs.readFileSync("public/app.js", "utf8");
+  assert.match(app, /WUKONG_RECOMMENDED_PRODUCTS/);
+  assert.match(app, /"image_nanoBanana2"/);
+  assert.match(app, /"image_gptImage2"/);
+  assert.match(html, /计费说明/);
+  assert.match(html, /仅根据 API 中转站当前返回的信息进行估算/);
+  assert.match(html, /API 中转站后台消费明细为准/);
+  assert.match(html, /页面价格仅为 API 中转站估算/);
+  assert.match(app, /此金额仅供估算/);
+});
+
+test("悟空上游超时会暂停批量提交且刷新脚本缓存", () => {
+  const app = fs.readFileSync("public/app.js", "utf8");
+  assert.match(html, /app\.js\?v=20260818-wukong-migration1/);
+  assert.match(app, /generation-queue\.js\?v=20260818-wukong-migration1/);
+  assert.match(app, /shouldHaltBatchGeneration/);
+  assert.match(app, /上游生图超时/);
+  assert.match(app, /工具不会自动重新提交/);
+  assert.match(app, /if \(batchHaltReason\) return false/);
+  assert.match(app, /上游超时，批量生成已暂停/);
 });

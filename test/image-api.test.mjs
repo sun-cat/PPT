@@ -313,7 +313,7 @@ test("submits and polls a Wukong GPT-Image-2 task", async () => {
     {
       endpoint: "https://wkapi.work/v1",
       apiKey: "sk-sk-test-key",
-      model: "gpt-image-1.5",
+      model: "image_gptImage2",
       size: "1536x1024",
       quality: "high",
       prompt: "make a 16:9 slide",
@@ -359,6 +359,122 @@ test("submits and polls a Wukong GPT-Image-2 task", async () => {
   });
   assert.equal(pollCount, 2);
   assert.equal(result, "data:image/png;base64,YWJj");
+});
+
+test("submits NanoBanana 2 with its documented product_id and 16:9 ratio", async () => {
+  const calls = [];
+  await generateSlideImage(
+    {
+      endpoint: "https://wkapi.work",
+      apiKey: "test-fixture-key",
+      model: "image_nanoBanana2",
+      size: "16:9",
+      quality: "high",
+      prompt: "make a 16:9 slide",
+    },
+    {
+      pollIntervalMs: 0,
+      timeoutMs: 1_000,
+      fetchImpl: async (url, options = {}) => {
+        const href = String(url);
+        calls.push({ href, options });
+        if (href.endsWith("/submit")) {
+          return new Response(JSON.stringify({ task_id: "task-nano" }), { status: 200 });
+        }
+        if (href.includes("/poll?")) {
+          return new Response(
+            JSON.stringify({ status: "succeeded", url: "data:image/png;base64,YWJj" }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`Unexpected URL: ${href}`);
+      },
+    },
+  );
+
+  const submit = calls.find((call) => call.href.endsWith("/submit"));
+  assert.deepEqual(JSON.parse(submit.options.body), {
+    product_id: "image_nanoBanana2",
+    payload: {
+      prompt: "make a 16:9 slide",
+      aspectRatio: "16:9",
+      size: "2K",
+    },
+    wait: false,
+  });
+});
+
+test("resumes an existing Wukong task without submitting or charging again", async () => {
+  const calls = [];
+  const result = await generateSlideImage(
+    {
+      endpoint: "https://wkapi.work",
+      apiKey: "test-fixture-key",
+      model: "image_nanoBanana2",
+      size: "16:9",
+      prompt: "resume the paid task",
+    },
+    {
+      existingWukongTask: {
+        taskId: "already-paid-task",
+        productId: "image_nanoBanana2",
+      },
+      pollIntervalMs: 0,
+      timeoutMs: 1_000,
+      fetchImpl: async (url, options = {}) => {
+        const href = String(url);
+        calls.push({ href, options });
+        if (href.includes("/poll?")) {
+          return new Response(
+            JSON.stringify({ status: "succeeded", url: "data:image/png;base64,YWJj" }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`A resumed task must not submit again: ${href}`);
+      },
+    },
+  );
+
+  assert.equal(calls.some((call) => call.href.endsWith("/submit")), false);
+  assert.match(calls[0].href, /task_id=already-paid-task/);
+  assert.equal(result, "data:image/png;base64,YWJj");
+});
+
+test("returns the submitted task id when polling repeatedly loses the network", async () => {
+  let pollCount = 0;
+  await assert.rejects(
+    generateSlideImage(
+      {
+        endpoint: "https://wkapi.work",
+        apiKey: "test-fixture-key",
+        model: "image_nanoBanana2",
+        size: "16:9",
+        prompt: "keep the task id",
+      },
+      {
+        pollIntervalMs: 0,
+        timeoutMs: 2_000,
+        fetchImpl: async (url) => {
+          const href = String(url);
+          if (href.endsWith("/submit")) {
+            return new Response(JSON.stringify({ task_id: "recover-me" }), { status: 200 });
+          }
+          if (href.includes("/poll?")) {
+            pollCount += 1;
+            throw new TypeError("fetch failed", { cause: { code: "ECONNRESET" } });
+          }
+          throw new Error(`Unexpected URL: ${href}`);
+        },
+      },
+    ),
+    (error) => {
+      assert.equal(error.wukongTaskPending, true);
+      assert.equal(error.wukongTaskId, "recover-me");
+      assert.equal(error.wukongProductId, "image_nanoBanana2");
+      return true;
+    },
+  );
+  assert.ok(pollCount > 1);
 });
 
 test("retries Wukong polling after a transient reset without resubmitting the paid task", async () => {
@@ -524,6 +640,7 @@ test("detects the Wukong catalog without generating an image", async () => {
         assert.equal(href, "https://wkapi.work/api/v1/studio/catalog");
         return new Response(
           JSON.stringify({
+            studio_limits: { max_parallel_image: 3 },
             main: {
               image: [
                 {
@@ -545,6 +662,8 @@ test("detects the Wukong catalog without generating an image", async () => {
   assert.equal(result.adjustedEndpoint, "https://wkapi.work/api/v1/studio");
   assert.equal(result.adjustedModel, "image_gptImage2");
   assert.equal(result.adjustedSize, "16:9");
+  assert.equal(result.products[0].id, "image_gptImage2");
+  assert.equal(result.studioLimits.max_parallel_image, 3);
   assert.match(result.message, /0\.15 元\/张/);
   assert.match(result.message, /无法在不提交付费任务/);
 });

@@ -2,11 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   computeCollageLayout,
+  computeImageFitRect,
+  computePerspectiveRasterSize,
   computeShowcaseCollageLayout,
   computeUnitSquareHomography,
+  expandTriangleForOverlap,
   hasDuplicatePageNumbers,
   parseFeaturedPageNumbers,
   projectUnitPoint,
+  resolvePerspectiveRasterAspect,
   validatePerspectiveQuad,
 } from "../public/image-tool-math.js";
 
@@ -131,4 +135,56 @@ test("supports the five common screen perspective directions", () => {
       assert.ok(Math.abs(projected.y - points[index].y) < 1e-8, `${name} y`);
     });
   }
+});
+
+test("expands perspective mesh triangles so neighboring clips overlap", () => {
+  const triangle = [
+    { x: 10, y: 10 },
+    { x: 110, y: 10 },
+    { x: 10, y: 90 },
+  ];
+  const expanded = expandTriangleForOverlap(triangle, 1);
+  const center = triangle.reduce(
+    (result, point) => ({ x: result.x + point.x / 3, y: result.y + point.y / 3 }),
+    { x: 0, y: 0 },
+  );
+  expanded.forEach((point, index) => {
+    assert.ok(
+      Math.hypot(point.x - center.x, point.y - center.y) >
+        Math.hypot(triangle[index].x - center.x, triangle[index].y - center.y),
+    );
+  });
+});
+
+test("cover fit always fills the target screen without exposed matte edges", () => {
+  const fit = computeImageFitRect(2560, 1440, 1600, 1000, "cover");
+  assert.ok(fit.x <= 0);
+  assert.ok(fit.y <= 0);
+  assert.ok(fit.x + fit.width >= 1600);
+  assert.ok(fit.y + fit.height >= 1000);
+  assert.equal(fit.mode, "cover");
+});
+
+test("contain fit preserves the whole image and may intentionally leave bars", () => {
+  const fit = computeImageFitRect(2560, 1440, 1600, 1000, "contain");
+  assert.equal(fit.x, 0);
+  assert.ok(fit.y > 0);
+  assert.equal(fit.width, 1600);
+  assert.ok(fit.height < 1000);
+  assert.equal(fit.mode, "contain");
+});
+
+test("warp mode keeps the replacement image aspect so the full page reaches all four corners", () => {
+  assert.equal(resolvePerspectiveRasterAspect(2560, 1440, 1.41, "warp"), 16 / 9);
+  assert.equal(resolvePerspectiveRasterAspect(2560, 1440, 1.41, "cover"), 1.41);
+});
+
+test("sizes perspective source rasters from the real screen pixels with a safe cap", () => {
+  assert.deepEqual(computePerspectiveRasterSize(16 / 9, 2400, 1200), {
+    width: 2640,
+    height: 1485,
+  });
+  const capped = computePerspectiveRasterSize(16 / 9, 6000, 3400);
+  assert.equal(capped.width, 4096);
+  assert.equal(capped.height, 2304);
 });

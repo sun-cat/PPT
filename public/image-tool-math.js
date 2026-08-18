@@ -224,6 +224,97 @@ export function estimateQuadAspect(points, width = 1, height = 1) {
   return Math.max(0.2, Math.min(5, horizontal / Math.max(1, vertical)));
 }
 
+export function expandTriangleForOverlap(points, pixels = 0.9) {
+  if (!Array.isArray(points) || points.length !== 3) return [];
+  const amount = Math.max(0, Number(pixels) || 0);
+  const center = points.reduce(
+    (result, point) => ({ x: result.x + point.x / 3, y: result.y + point.y / 3 }),
+    { x: 0, y: 0 },
+  );
+  return points.map((point) => {
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < EPSILON || amount === 0) return { ...point };
+    const scale = (distance + amount) / distance;
+    return {
+      x: center.x + dx * scale,
+      y: center.y + dy * scale,
+    };
+  });
+}
+
+export function computeImageFitRect(
+  sourceWidth,
+  sourceHeight,
+  targetWidth,
+  targetHeight,
+  fitMode = "cover",
+) {
+  const safeSourceWidth = Number(sourceWidth);
+  const safeSourceHeight = Number(sourceHeight);
+  const safeTargetWidth = Number(targetWidth);
+  const safeTargetHeight = Number(targetHeight);
+  if (
+    ![safeSourceWidth, safeSourceHeight, safeTargetWidth, safeTargetHeight]
+      .every((value) => Number.isFinite(value) && value > 0)
+  ) {
+    throw new Error("图片和目标区域的尺寸必须大于 0。");
+  }
+  const mode = fitMode === "contain" ? "contain" : "cover";
+  const widthScale = safeTargetWidth / safeSourceWidth;
+  const heightScale = safeTargetHeight / safeSourceHeight;
+  const scale = mode === "contain"
+    ? Math.min(widthScale, heightScale)
+    : Math.max(widthScale, heightScale);
+  const width = safeSourceWidth * scale;
+  const height = safeSourceHeight * scale;
+  return {
+    x: (safeTargetWidth - width) / 2,
+    y: (safeTargetHeight - height) / 2,
+    width,
+    height,
+    mode,
+  };
+}
+
+export function resolvePerspectiveRasterAspect(
+  sourceWidth,
+  sourceHeight,
+  estimatedQuadAspect,
+  fitMode = "warp",
+) {
+  const sourceRatio = Number(sourceWidth) / Number(sourceHeight);
+  if (!Number.isFinite(sourceRatio) || sourceRatio <= 0) {
+    throw new Error("替换画面的尺寸无效。");
+  }
+  if (fitMode === "warp") return sourceRatio;
+  return Math.max(0.2, Math.min(5, Number(estimatedQuadAspect) || sourceRatio));
+}
+
+export function computePerspectiveRasterSize(
+  aspect,
+  targetWidth,
+  targetHeight,
+  { minDimension = 480, maxDimension = 4096, oversample = 1.1 } = {},
+) {
+  const safeAspect = Math.max(0.2, Math.min(5, Number(aspect) || 16 / 9));
+  const safeMinimum = Math.max(1, Math.round(Number(minDimension) || 1));
+  const safeMaximum = Math.max(safeMinimum, Math.round(Number(maxDimension) || safeMinimum));
+  const safeOversample = Math.max(1, Number(oversample) || 1);
+  const desiredWidth = Math.max(
+    Number(targetWidth) || 0,
+    (Number(targetHeight) || 0) * safeAspect,
+  ) * safeOversample;
+  let width = Math.max(safeMinimum, Math.min(safeMaximum, Math.round(desiredWidth)));
+  let height = Math.max(1, Math.round(width / safeAspect));
+  if (height > safeMaximum) {
+    height = safeMaximum;
+    width = Math.max(1, Math.round(height * safeAspect));
+  }
+  return { width, height };
+}
+
 export function affineFromTriangles(source, destination) {
   const [s0, s1, s2] = source;
   const [d0, d1, d2] = destination;

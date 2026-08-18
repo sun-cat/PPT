@@ -1921,6 +1921,85 @@ button {
   line-height: 1.55;
 }
 
+.wukong-product-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 17px;
+  padding: 16px;
+  border: 1px solid #bddfd1;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eef9f4, #fbfdfc);
+}
+
+.wukong-product-field[hidden] {
+  display: none;
+}
+
+.wukong-product-field > label {
+  color: #24473c;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.wukong-product-field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 42px 0 14px;
+  border: 1px solid #a9cfc0;
+  border-radius: 11px;
+  background: #fff;
+  color: #173d32;
+  font-size: 15px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.wukong-product-field select:focus-visible {
+  outline: 3px solid rgba(46, 111, 94, 0.2);
+  outline-offset: 2px;
+}
+
+.wukong-product-field > small,
+.wukong-cost-estimate {
+  color: #5f736c;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.wukong-cost-estimate {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.wukong-cost-estimate.is-pro {
+  border: 1px solid #efc9a8;
+  background: #fff7ed;
+  color: #9a4810;
+}
+
+.wukong-billing-note {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid #e7c79e;
+  border-radius: 10px;
+  background: #fffaf1;
+  color: #68451f;
+}
+
+.wukong-billing-note strong {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.wukong-billing-note p {
+  margin: 0;
+  color: #765631;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 .provider-preset {
   display: flex;
   align-items: center;

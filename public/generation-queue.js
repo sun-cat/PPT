@@ -1,4 +1,4 @@
-export const allowedGenerationConcurrency = [2, 4, 6];
+export const allowedGenerationConcurrency = [1, 2, 3, 4, 6];
 
 export function normalizeGenerationConcurrency(value, fallback = 2) {
   const parsed = Number.parseInt(String(value), 10);

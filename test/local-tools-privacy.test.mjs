@@ -28,6 +28,16 @@ test("scene replacement exports every uploaded image in one local ZIP", () => {
   assert.match(toolsSource, /批量导出 JPG/);
 });
 
+test("scene perspective rendering overlaps mesh clips and masks the outer screen edge", () => {
+  assert.match(toolsSource, /expandTriangleForOverlap\(destinationPoints\)/);
+  assert.match(toolsSource, /resolvePerspectiveRasterAspect\(/);
+  assert.match(toolsSource, /computePerspectiveRasterSize\(rasterAspect, targetWidth, targetHeight\)/);
+  assert.match(toolsSource, /options\.fitMode === "warp"/);
+  assert.match(toolsSource, /context\.drawImage\(source, 0, 0, width, height\)/);
+  assert.match(toolsSource, /globalCompositeOperation = "destination-in"/);
+  assert.match(toolsSource, /imageSmoothingQuality = "high"/);
+});
+
 test("local tools only fetch the local PPT extraction route", () => {
   const fetchTargets = [...toolsSource.matchAll(/fetch\(\s*["'`]([^"'`]+)["'`]/g)].map(
     (match) => match[1],

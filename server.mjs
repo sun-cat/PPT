@@ -340,6 +340,8 @@ async function handleRequest(request, response) {
             ),
             referenceImageDataUrl: input.referenceImageDataUrl || "",
             referenceImageName: input.referenceImageName || "",
+          }, {
+            existingWukongTask: input.existingWukongTask || null,
           });
 
     sendJson(response, 200, { imageDataUrl, prompt });
@@ -513,9 +515,17 @@ const server = http.createServer((request, response) => {
   handleRequest(request, response).catch((error) => {
     console.error(`[${new Date().toISOString()}] ${error.message}`);
     if (!response.headersSent) {
-      sendJson(response, error.statusCode || 500, {
+      const payload = {
         error: error.message || "服务器处理失败。",
-      });
+      };
+      if (error.wukongTaskPending && error.wukongTaskId) {
+        payload.pendingTask = {
+          taskId: String(error.wukongTaskId),
+          productId: String(error.wukongProductId || ""),
+        };
+      }
+      if (error.wukongTaskFinal) payload.taskFinal = true;
+      sendJson(response, error.statusCode || 500, payload);
     } else {
       response.destroy();
     }

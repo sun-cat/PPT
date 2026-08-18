@@ -13,7 +13,7 @@ import {
 import {
   normalizeGenerationConcurrency,
   runConcurrentTasks,
-} from "/generation-queue.js?v=20260813-wukong-stable-queue";
+} from "/generation-queue.js?v=20260818-wukong-migration1";
 import {
   deleteCoursewareArchive,
   getCoursewareArchive,
@@ -27,6 +27,39 @@ const slideGrid = $("#slideGrid");
 const draftStorageKey = "visiondeck-draft-v1";
 const settingsStorageKey = "visiondeck-api-settings-v1";
 const concurrencyStorageKey = "visiondeck-generation-concurrency-v2";
+const WUKONG_RECOMMENDED_PRODUCT = "image_nanoBanana2";
+const WUKONG_RECOMMENDED_PRODUCTS = new Set([
+  "image_nanoBanana2",
+  "image_gptImage2",
+]);
+const WUKONG_PRODUCTS = [
+  {
+    id: "image_nanoBanana2",
+    name: "NanoBanana 2",
+    price: "0.15 元/张",
+    desc: "批量课件推荐，速度与质量均衡",
+  },
+  {
+    id: "image_gptImage2",
+    name: "GPT-Image-2",
+    price: "0.15 元/张",
+    desc: "推荐模型，画面细节较稳；通道繁忙时可能较慢",
+  },
+  {
+    id: "image_nanoBanana2Lite",
+    name: "NanoBanana 2 Lite",
+    price: "0.12 元/张",
+    desc: "快速试稿，固定 1K",
+  },
+  {
+    id: "image_nanoBanana_pro",
+    name: "NanoBanana Pro",
+    price: "0.45 元/张",
+    desc: "复杂页面精修，不自动切换",
+  },
+];
+let availableWukongProducts = [...WUKONG_PRODUCTS];
+let wukongMaxParallel = 3;
 
 const projectFields = {
   deckTitle: $("#deckTitle"),
@@ -89,6 +122,97 @@ function refreshSeedreamModelSelection() {
   }
 }
 
+function wukongProductById(id) {
+  return (
+    availableWukongProducts.find((product) => product.id === id) ||
+    WUKONG_PRODUCTS.find((product) => product.id === id)
+  );
+}
+
+function wukongUnitPrice(product) {
+  return Number.parseFloat(String(product?.price || "").match(/[\d.]+/)?.[0] || "0");
+}
+
+function populateWukongProducts(products = availableWukongProducts) {
+  const select = $("#wukongProduct");
+  if (!select) return;
+  const validProducts = (Array.isArray(products) ? products : [])
+    .filter((product) => /^image_[a-z0-9_-]+$/i.test(String(product?.id || "")))
+    .filter((product) => wukongUnitPrice(product) > 0);
+  if (validProducts.length) availableWukongProducts = validProducts;
+  const selected = apiFields.model.value.trim();
+  select.innerHTML = "";
+  for (const product of availableWukongProducts) {
+    const option = document.createElement("option");
+    option.value = product.id;
+    const suffix = WUKONG_RECOMMENDED_PRODUCTS.has(product.id)
+      ? " · 推荐"
+      : product.id === "image_nanoBanana_pro"
+        ? " · 精修"
+        : "";
+    option.textContent = `${product.name} · ${product.price || "价格以供应商为准"}${suffix}`;
+    select.appendChild(option);
+  }
+  const canKeepSelected = availableWukongProducts.some((product) => product.id === selected);
+  const nextProduct = canKeepSelected
+    ? selected
+    : availableWukongProducts.some((product) => product.id === WUKONG_RECOMMENDED_PRODUCT)
+      ? WUKONG_RECOMMENDED_PRODUCT
+      : availableWukongProducts[0]?.id || WUKONG_RECOMMENDED_PRODUCT;
+  select.value = nextProduct;
+  apiFields.model.value = nextProduct;
+}
+
+function configureConcurrencyOptions() {
+  const select = $("#generationConcurrency");
+  if (!select) return;
+  const wukong = isWukongStudioEndpoint(apiFields.endpoint.value);
+  const options = wukong
+    ? [
+        { value: 1, label: "1 张（最稳）" },
+        { value: 2, label: "2 张（推荐）" },
+        { value: 3, label: "3 张（上限）" },
+      ].filter((option) => option.value <= wukongMaxParallel)
+    : [
+        { value: 2, label: "2 张（更稳）" },
+        { value: 4, label: "4 张（推荐）" },
+        { value: 6, label: "6 张（更快）" },
+      ];
+  const previous = Number.parseInt(
+    select.value || localStorage.getItem(concurrencyStorageKey),
+    10,
+  );
+  select.innerHTML = "";
+  for (const item of options) {
+    const option = document.createElement("option");
+    option.value = String(item.value);
+    option.textContent = item.label;
+    select.appendChild(option);
+  }
+  const allowed = options.map((option) => option.value);
+  const next = allowed.includes(previous)
+    ? previous
+    : wukong
+      ? Math.min(2, wukongMaxParallel)
+      : 4;
+  select.value = String(next);
+  localStorage.setItem(concurrencyStorageKey, String(next));
+}
+
+function updateWukongCostEstimate() {
+  const output = $("#wukongCostEstimate");
+  const select = $("#wukongProduct");
+  if (!output || !select || !isWukongStudioEndpoint(apiFields.endpoint.value)) return;
+  const product = wukongProductById(select.value);
+  const price = wukongUnitPrice(product);
+  const pageCount = slides.length;
+  const estimate = pageCount && price
+    ? `；当前 ${pageCount} 页一次生成约 ${(pageCount * price).toFixed(2)} 元`
+    : "";
+  output.classList.toggle("is-pro", select.value === "image_nanoBanana_pro");
+  output.textContent = `${product?.desc || "价格以 API 中转站目录为准"}${estimate}。此金额仅供估算，实际扣款以 API 中转站后台消费明细为准；重新生成可能另计费用。`;
+}
+
 function refreshApiProviderGuidance() {
   const providerMode = imageProviderMode(apiFields.endpoint.value);
   const wukong = providerMode === "wukong";
@@ -107,7 +231,7 @@ function refreshApiProviderGuidance() {
       ? "已识别火山方舟豆包生图"
       : "普通使用只需填写以上两项";
   $("#autoConfigMessage").textContent = wukong
-    ? "系统会先直连悟空接口；直连失败时自动切换系统代理。检测成功后会沿用可用线路，避免付费任务重复提交。"
+    ? "请选择具体生图模型；系统会先直连悟空接口，失败时自动切换系统代理，并保留已提交任务供继续取回。"
     : volcengine
       ? "系统只调用 Seedream 图片生成接口；参考图会按豆包格式发送，并固定一次生成一张 16:9 课件图。"
       : "检测地址、图片生成地址、参考图接口和网络代理均由系统自动判断。";
@@ -117,7 +241,7 @@ function refreshApiProviderGuidance() {
       ? "豆包图片模型 ID"
       : "模型名称";
   $("#modelHelp").textContent = wukong
-    ? "推荐 image_gptImage2（GPT-Image-2，当前 0.15 元/张），检测连接会自动填写。"
+    ? "具体产品由上方“生图模型”控制，不需要手动填写 product_id。"
     : volcengine
       ? "已由上方“豆包图片模型”同步；自定义时可填写 Seedream Model ID 或 ep-...。"
       : "默认使用 GPT Image 2，一般不需要修改。";
@@ -131,7 +255,11 @@ function refreshApiProviderGuidance() {
     const element = $(`#${id}`);
     element.hidden = wukong || volcengine;
   }
-  $("#modelField").hidden = volcengine;
+  $("#modelField").hidden = wukong || volcengine;
+  $("#wukongProductField").hidden = !wukong;
+  if (wukong) populateWukongProducts();
+  configureConcurrencyOptions();
+  updateWukongCostEstimate();
   refreshProxyStatus();
 }
 
@@ -160,7 +288,7 @@ function applyImageProviderPreset(provider, { clearKey = true } = {}) {
   const presets = {
     wukong: {
       endpoint: "https://wkapi.work",
-      model: "image_gptImage2",
+      model: "image_nanoBanana2",
       size: "16:9",
       quality: "high",
     },
@@ -307,8 +435,10 @@ function invalidateGeneratedSlides(message) {
   for (const slide of affected) {
     slide.imageDataUrl = "";
     slide.prompt = "";
-    slide.status = "idle";
-    slide.error = "";
+    slide.status = slide.pendingTask ? "recoverable" : "idle";
+    slide.error = slide.pendingTask
+      ? "本页要求已修改，但此前的付费任务仍可继续取回；取回内容会对应修改前的要求。"
+      : "";
   }
   renderSlides();
   if (message) toast(message);
@@ -506,6 +636,7 @@ function newSlide(page) {
     prompt: "",
     status: "idle",
     error: "",
+    pendingTask: null,
   };
 }
 
@@ -513,6 +644,7 @@ function statusMeta(status) {
   if (status === "working") return ["working", "生成中"];
   if (status === "success") return ["success", "已完成"];
   if (status === "error") return ["error", "失败"];
+  if (status === "recoverable") return ["working", "待取回"];
   return ["neutral", "待生成"];
 }
 
@@ -550,14 +682,18 @@ function renderSlides() {
     const hasPreviousImage = Boolean(slide.imageDataUrl);
     if (slide.status === "working") {
       retry.textContent = hasPreviousImage ? "正在重新生成…" : "正在生成…";
+    } else if (slide.pendingTask) {
+      retry.textContent = "继续取回结果";
     } else {
       retry.textContent = hasPreviousImage
         ? "↻ 再抽一张（替换本页）"
         : "生成这一页";
     }
-    retryNote.textContent = hasPreviousImage
-      ? "当前图片会保留，成功后才替换"
-      : "只生成这一页，不影响其他页面";
+    retryNote.textContent = slide.pendingTask
+      ? "沿用已提交任务，不会再次扣费"
+      : hasPreviousImage
+        ? "当前图片会保留，成功后才替换"
+        : "只生成这一页，不影响其他页面";
     retry.disabled =
       slide.status === "working" || busy || sourceDirty || styleDirty;
     retry.setAttribute(
@@ -570,6 +706,7 @@ function renderSlides() {
     slideGrid.appendChild(fragment);
   });
   updateProgress();
+  updateWukongCostEstimate();
 }
 
 function showWarnings(warnings) {
@@ -771,6 +908,9 @@ function clearPageStyles() {
 }
 
 function collectRawApiSettings() {
+  if (apiFields.provider.value === "wukong") {
+    apiFields.model.value = $("#wukongProduct").value;
+  }
   if (apiFields.provider.value === "volcengine-seedream") {
     const preset = $("#seedreamModelPreset").value;
     apiFields.model.value = preset === "custom"
@@ -970,7 +1110,10 @@ async function apiRequest(url, options = {}) {
     ? await response.json()
     : await response.blob();
   if (!response.ok) {
-    throw new Error(body?.error || `请求失败（HTTP ${response.status}）`);
+    const error = new Error(body?.error || `请求失败（HTTP ${response.status}）`);
+    error.pendingTask = body?.pendingTask || null;
+    error.taskFinal = Boolean(body?.taskFinal);
+    throw error;
   }
   return { body, response };
 }
@@ -1037,6 +1180,16 @@ async function testConnection() {
           : `模型改为 ${body.adjustedModel}`,
       );
     }
+    if (Array.isArray(body.products) && body.products.length) {
+      populateWukongProducts(body.products);
+    }
+    if (body.studioLimits?.max_parallel_image) {
+      wukongMaxParallel = Math.max(
+        1,
+        Math.min(3, Number.parseInt(body.studioLimits.max_parallel_image, 10) || 3),
+      );
+      configureConcurrencyOptions();
+    }
     if (body.adjustedSize) {
       apiFields.size.value = body.adjustedSize;
       adjustments.push(
@@ -1087,6 +1240,9 @@ async function testConnection() {
 
 function friendlyGenerationError(error) {
   const message = String(error?.message || error || "图片生成失败。");
+  if (/上游生图超时|图片生成超时/.test(message)) {
+    return "API 中转站上游生图超时，本次没有取得图片。请先到中转站后台核对该任务是否扣费，再切换 NanoBanana 2 或 GPT-Image-2 中的另一个推荐模型后重试；工具不会自动重新提交。";
+  }
   if (/上游图片服务中途断开连接/.test(message)) {
     return `${message} 当前平台请先在“接口设置”里重新检测，工具会自动选择其开放的生图模型。`;
   }
@@ -1097,6 +1253,11 @@ function friendlyGenerationError(error) {
     return "图片服务暂时繁忙（HTTP 503），请稍后点击“生成本页”重试。";
   }
   return message;
+}
+
+function shouldHaltBatchGeneration(error) {
+  const message = String(error?.message || error || "");
+  return /上游生图超时|图片生成超时|上游图片服务中途断开连接|无可用渠道|HTTP 503|图片服务暂时繁忙|通道.*(?:繁忙|不可用)/i.test(message);
 }
 
 function defaultVisualPrompt(slide) {
@@ -1111,7 +1272,7 @@ function defaultVisualPrompt(slide) {
   ].join("");
 }
 
-async function generateOne(id, { silent = false } = {}) {
+async function generateOne(id, { silent = false, onBatchHalt = null } = {}) {
   const slide = slides.find((item) => item.id === id);
   if (!slide || slide.status === "working") return false;
   if (sourceDirty || styleDirty) {
@@ -1161,11 +1322,13 @@ async function generateOne(id, { silent = false } = {}) {
         visualPrompt: defaultVisualPrompt(slide),
         globalPrompt: projectFields.globalPrompt.value.trim(),
         ...referencePayload,
+        existingWukongTask: slide.pendingTask,
       }),
     });
     slide.imageDataUrl = body.imageDataUrl;
     slide.prompt = body.prompt;
     slide.status = "success";
+    slide.pendingTask = null;
     scheduleArchiveSave();
     connectionVerified = true;
     connectionReachable = true;
@@ -1182,15 +1345,23 @@ async function generateOne(id, { silent = false } = {}) {
     return true;
   } catch (error) {
     const friendlyError = friendlyGenerationError(error);
+    if (shouldHaltBatchGeneration(error) && typeof onBatchHalt === "function") {
+      onBatchHalt(friendlyError);
+    }
+    if (error.taskFinal) slide.pendingTask = null;
+    if (error.pendingTask?.taskId) slide.pendingTask = error.pendingTask;
     if (previousImageDataUrl) {
       slide.imageDataUrl = previousImageDataUrl;
       slide.prompt = previousPrompt;
       slide.status = "success";
       slide.error = `重新生成失败，已保留上一张图片。${friendlyError}`;
     } else {
-      slide.status = "error";
-      slide.error = friendlyError;
+      slide.status = slide.pendingTask ? "recoverable" : "error";
+      slide.error = slide.pendingTask
+        ? `任务已经提交并可能已扣费，但暂时没有取回结果。请点击“继续取回结果”，工具不会创建新任务。${friendlyError}`
+        : friendlyError;
     }
+    if (slide.pendingTask) scheduleArchiveSave();
     setConnectionState("error", "生成请求失败");
     if (!silent) {
       toast(
@@ -1230,12 +1401,21 @@ async function generateAll() {
   const concurrency = normalizeGenerationConcurrency(
     $("#generationConcurrency")?.value,
   );
+  let batchHaltReason = "";
   busy = true;
   renderSlides();
   try {
     await runConcurrentTasks(
       pending,
-      (slide) => generateOne(slide.id, { silent: true }),
+      (slide) => {
+        if (batchHaltReason) return false;
+        return generateOne(slide.id, {
+          silent: true,
+          onBatchHalt: (reason) => {
+            if (!batchHaltReason) batchHaltReason = reason;
+          },
+        });
+      },
       concurrency,
     );
   } finally {
@@ -1244,7 +1424,20 @@ async function generateAll() {
   }
   await flushArchiveSave();
   const failed = slides.filter((slide) => slide.status === "error").length;
-  toast(failed ? `生成结束，${failed} 页需要重试` : "全部页面生成完成");
+  const recoverable = slides.filter((slide) => slide.status === "recoverable").length;
+  const unsubmitted = slides.filter((slide) => slide.status === "idle").length;
+  if (batchHaltReason) {
+    setConnectionState("error", "上游超时，批量生成已暂停");
+    toast(`已暂停后续提交，剩余 ${unsubmitted} 页未提交；请先核对扣费并切换模型`);
+  } else {
+    toast(
+      recoverable
+        ? `生成结束，${recoverable} 页可继续取回结果`
+        : failed
+          ? `生成结束，${failed} 页需要重试`
+          : "全部页面生成完成",
+    );
+  }
 }
 
 function dataUrlToBlob(dataUrl) {
@@ -1312,7 +1505,8 @@ async function archiveBlobForSlide(slide) {
 
 async function buildCurrentArchive() {
   const completed = slides.filter((slide) => slide.status === "success" && slide.imageDataUrl);
-  if (!completed.length) return null;
+  const hasPendingTasks = slides.some((slide) => slide.pendingTask?.taskId);
+  if (!completed.length && !hasPendingTasks) return null;
 
   const now = Date.now();
   if (!activeArchiveId) activeArchiveId = createArchiveId();
@@ -1327,6 +1521,7 @@ async function buildCurrentArchive() {
       visualPrompt: slide.visualPrompt,
       pageStylePrompt: slide.pageStylePrompt,
       prompt: slide.prompt,
+      pendingTask: slide.pendingTask || null,
       status: slide.status === "success" && slide.imageDataUrl ? "success" : "idle",
       imageBlob: slide.imageDataUrl ? await archiveBlobForSlide(slide) : null,
     });
@@ -1366,7 +1561,7 @@ async function buildCurrentArchive() {
     pageCount: slides.length,
     completedCount: completed.length,
     complete,
-    coverDataUrl: await createArchiveThumbnail(completed[0].imageDataUrl),
+    coverDataUrl: completed.length ? await createArchiveThumbnail(completed[0].imageDataUrl) : "",
   };
   return { project, summary };
 }
@@ -1411,7 +1606,7 @@ async function saveCurrentArchive({ notify = false } = {}) {
 }
 
 function scheduleArchiveSave() {
-  if (!slides.some((slide) => slide.imageDataUrl)) return;
+  if (!slides.some((slide) => slide.imageDataUrl || slide.pendingTask?.taskId)) return;
   clearTimeout(archiveSaveTimer);
   archiveSaveTimer = setTimeout(() => {
     archiveSaveChain = archiveSaveChain
@@ -1741,6 +1936,7 @@ async function restoreArchiveProject(id, button) {
       slide.prompt = saved.prompt || "";
       slide.pageStylePrompt = saved.pageStylePrompt || slide.pageStylePrompt;
       slide.error = "";
+      slide.pendingTask = saved.pendingTask || null;
       if (saved.imageBlob) {
         slide.imageDataUrl = await blobToDataUrl(saved.imageBlob);
         slide.status = "success";
@@ -1750,7 +1946,7 @@ async function restoreArchiveProject(id, button) {
         });
       } else {
         slide.imageDataUrl = "";
-        slide.status = "idle";
+        slide.status = slide.pendingTask ? "recoverable" : "idle";
       }
     }
 
@@ -1843,7 +2039,8 @@ async function boot() {
     if (!apiFields.model.value) apiFields.model.value = config.model || "";
     if (!apiFields.size.value) apiFields.size.value = config.size || "2048x1152";
     if (!apiFields.quality.value) apiFields.quality.value = config.quality || "high";
-    refreshProxyStatus();
+    apiFields.provider.value = imageProviderMode(apiFields.endpoint.value);
+    refreshApiProviderGuidance();
     setConnectionState(
       mockMode
         ? "verified"
@@ -1899,6 +2096,15 @@ $("#clearApiSettingsButton").addEventListener("click", clearApiSettings);
 $("#testConnectionButton").addEventListener("click", testConnection);
 apiFields.provider.addEventListener("change", () => {
   applyImageProviderPreset(apiFields.provider.value);
+});
+$("#wukongProduct").addEventListener("change", (event) => {
+  apiFields.model.value = event.target.value;
+  updateWukongCostEstimate();
+  connectionVerified = false;
+  connectionReachable = false;
+  connectionConfigured = false;
+  setTestResult("neutral", "生图模型已修改，请重新检测连接");
+  setConnectionState("warning", "API 待检测");
 });
 $("#seedreamModelPreset").addEventListener("change", (event) => {
   const custom = $("#seedreamCustomModel");
