@@ -6,6 +6,7 @@ import {
   deriveTestEndpoint,
   extractImageCandidate,
   generateSlideImage,
+  isApiMartEndpoint,
   isVolcengineSeedreamEndpoint,
   isWukongStudioEndpoint,
   normalizeImageEndpoint,
@@ -57,6 +58,12 @@ test("normalizes Volcengine Ark to the Seedream image endpoint", () => {
     normalizeImageEndpoint("https://ark.cn-beijing.volces.com/api/v3"),
     "https://ark.cn-beijing.volces.com/api/v3/images/generations",
   );
+});
+
+test("recognizes APIMart public API hosts", () => {
+  assert.equal(isApiMartEndpoint("https://api.aiuxu.com/v1"), true);
+  assert.equal(isApiMartEndpoint("https://api.apib.ai/v1"), true);
+  assert.equal(isApiMartEndpoint("https://api.example.com/v1"), false);
 });
 
 test("builds a page-specific prompt with exact copy and 16:9 constraints", () => {
@@ -249,6 +256,158 @@ test("rejects Seedance video models in the Volcengine image provider", async () 
     }),
     /Seedance 是视频模型/,
   );
+});
+
+test("submits and polls an APIMart GPT Image 2 task", async () => {
+  const calls = [];
+  let pollCount = 0;
+  const result = await generateSlideImage(
+    {
+      endpoint: "https://api.aiuxu.com/v1",
+      apiKey: "fixture-token",
+      model: "gpt-image-2",
+      size: "16:9",
+      quality: "high",
+      prompt: "make a 16:9 courseware slide",
+      extraBody: { resolution: "1k" },
+    },
+    {
+      pollIntervalMs: 0,
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), options });
+        if (String(url).endsWith("/v1/images/generations")) {
+          return new Response(
+            JSON.stringify({
+              code: 200,
+              data: [{ status: "submitted", task_id: "task_apimart_fixture" }],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (String(url).endsWith("/v1/tasks/task_apimart_fixture")) {
+          pollCount += 1;
+          return new Response(
+            JSON.stringify(
+              pollCount === 1
+                ? { code: 200, data: { status: "processing" } }
+                : {
+                    code: 200,
+                    data: {
+                      status: "completed",
+                      result: {
+                        images: [{ url: ["https://cdn.example.com/apimart.png"] }],
+                      },
+                    },
+                  },
+            ),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (String(url) === "https://cdn.example.com/apimart.png") {
+          return new Response(Buffer.from("abc"), {
+            status: 200,
+            headers: { "content-type": "image/png" },
+          });
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    },
+  );
+
+  const submitCall = calls.find((call) => call.url.endsWith("/v1/images/generations"));
+  assert.equal(submitCall.options.headers.authorization, "Bearer fixture-token");
+  assert.deepEqual(JSON.parse(submitCall.options.body), {
+    model: "gpt-image-2",
+    prompt: "make a 16:9 courseware slide",
+    n: 1,
+    size: "16:9",
+    resolution: "1k",
+  });
+  assert.equal(pollCount, 2);
+  assert.equal(result, "data:image/png;base64,YWJj");
+});
+
+test("uploads an APIMart reference image before submitting the task", async () => {
+  const calls = [];
+  const result = await generateSlideImage(
+    {
+      endpoint: "https://api.aiuxu.com/v1",
+      apiKey: "fixture-token",
+      model: "gpt-image-2",
+      size: "16:9",
+      prompt: "redesign this reference",
+      referenceImageDataUrl: "data:image/png;base64,YWJj",
+      referenceImageName: "参考图.png",
+    },
+    {
+      pollIntervalMs: 0,
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), options });
+        if (String(url).endsWith("/v1/uploads/images")) {
+          return new Response(
+            JSON.stringify({ data: { url: "https://cdn.example.com/reference.png" } }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (String(url).endsWith("/v1/images/generations")) {
+          return new Response(
+            JSON.stringify({ data: [{ b64_json: "ZGVm" }] }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    },
+  );
+
+  const uploadCall = calls.find((call) => call.url.endsWith("/v1/uploads/images"));
+  const submitCall = calls.find((call) => call.url.endsWith("/v1/images/generations"));
+  assert.ok(uploadCall.options.body instanceof FormData);
+  assert.equal(uploadCall.options.body.get("file").type, "image/png");
+  assert.deepEqual(JSON.parse(submitCall.options.body).image_urls, [
+    "https://cdn.example.com/reference.png",
+  ]);
+  assert.equal(result, "data:image/png;base64,ZGVm");
+});
+
+test("resumes an APIMart task without submitting it again", async () => {
+  const calls = [];
+  const result = await generateSlideImage(
+    {
+      endpoint: "https://api.aiuxu.com/v1",
+      apiKey: "fixture-token",
+      model: "gpt-image-2",
+      size: "16:9",
+      prompt: "resume task",
+    },
+    {
+      pollIntervalMs: 0,
+      existingWukongTask: {
+        taskId: "task_resume_fixture",
+        productId: "apimart:gpt-image-2",
+      },
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), options });
+        if (String(url).endsWith("/v1/tasks/task_resume_fixture")) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                status: "completed",
+                result: { images: [{ image: "Z2hp" }] },
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    },
+  );
+
+  assert.deepEqual(calls.map((call) => call.url), [
+    "https://api.aiuxu.com/v1/tasks/task_resume_fixture",
+  ]);
+  assert.equal(result, "data:image/png;base64,Z2hp");
 });
 
 test("sends a multipart image edit request when a reference image is present", async () => {

@@ -636,17 +636,17 @@
       <section class="tool-hero">
         <div>
           <p class="eyebrow">XIAOHONGSHU COVER COLLAGE</p>
-          <h1>把 PPT 页面拼成商品封面</h1>
-          <p>上传 16:9 PPTX，自动读取或渲染完整页面，从两种竖版 3:4 商品主图中选择适合当前课件的版式。</p>
+          <h1>把 PPT 页面拼成商品封面或课件长图</h1>
+          <p>上传 16:9 PPTX，共用一次页面提取；既能做单张商品封面，也能按顺序批量生成 2—13 页一组的竖版拼图。</p>
         </div>
         <span class="local-only-badge">本地处理 · 不消耗 Token</span>
       </section>
 
       <ol class="tool-step-strip" aria-label="PPT 拼图操作步骤">
         <li class="active"><span>1</span><strong>上传 PPTX</strong><small>渲染完整页面</small></li>
-        <li><span>2</span><strong>选择版式</strong><small>两种商品主图</small></li>
-        <li><span>3</span><strong>设置重点页</strong><small>自动排列页面</small></li>
-        <li><span>4</span><strong>导出封面</strong><small>PNG 或 JPG</small></li>
+        <li><span>2</span><strong>选择模式</strong><small>封面或批量拼图</small></li>
+        <li><span>3</span><strong>设置版式</strong><small>自动顺序分组</small></li>
+        <li><span>4</span><strong>导出图片</strong><small>单张或 ZIP</small></li>
       </ol>
 
       <div class="tool-editor-layout collage-editor-layout">
@@ -670,6 +670,21 @@
           <p id="collageExtractStatus" class="tool-status" role="status" aria-live="polite">等待上传 PPTX。</p>
 
           <div class="tool-divider"></div>
+          <fieldset class="collage-mode-fieldset">
+            <legend>拼图用途</legend>
+            <div class="collage-mode-switch" role="radiogroup" aria-label="拼图用途">
+              <label>
+                <input type="radio" name="collageMode" value="cover" checked />
+                <span><strong>商品封面</strong><small>生成 1 张主图</small></span>
+              </label>
+              <label>
+                <input type="radio" name="collageMode" value="batch" />
+                <span><strong>批量课件拼图</strong><small>分组生成 ZIP</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div id="collageCoverSettings">
           <div class="tool-card-heading compact">
             <span class="tool-index">02</span>
             <div><h2>商品主图设置</h2><p>选择版式，再指定需要重点展示的页面。</p></div>
@@ -699,22 +714,83 @@
             <span class="color-field"><input id="collageBackgroundColor" type="color" value="#e9ece8" /><output id="collageColorValue">#E9ECE8</output></span>
           </label>
           <button id="renderCollageButton" class="button primary tool-wide-button" type="button" disabled>生成拼图预览</button>
+          </div>
+
+          <div id="collageBatchSettings" hidden>
+            <div class="tool-card-heading compact">
+              <span class="tool-index">02</span>
+              <div><h2>批量拼图设置</h2><p>勾选页面后按原页码顺序连续分组。</p></div>
+            </div>
+            <fieldset class="collage-template-fieldset">
+              <legend>拼图形式</legend>
+              <div class="batch-layout-options">
+                <label><input type="radio" name="batchLayout" value="theme-grid" checked /><span><b class="batch-layout-icon theme-grid" aria-hidden="true"></b><strong>主题宫格</strong><small>1 张主题＋4/6/9/12 张</small></span></label>
+                <label><input type="radio" name="batchLayout" value="two" /><span><b class="batch-layout-icon two" aria-hidden="true"></b><strong>2 拼</strong><small>每 2 页一组</small></span></label>
+                <label><input type="radio" name="batchLayout" value="three" /><span><b class="batch-layout-icon three" aria-hidden="true"></b><strong>3 拼</strong><small>每 3 页一组</small></span></label>
+                <label><input type="radio" name="batchLayout" value="four" /><span><b class="batch-layout-icon four" aria-hidden="true"></b><strong>4 拼</strong><small>每 4 页一组</small></span></label>
+                <label><input type="radio" name="batchLayout" value="five" /><span><b class="batch-layout-icon five" aria-hidden="true"></b><strong>5 拼</strong><small>每 5 页一组</small></span></label>
+              </div>
+            </fieldset>
+            <label id="batchGridField" class="tool-field" for="batchGridCount">
+              <span>宫格页数</span>
+              <select id="batchGridCount">
+                <option value="4">主题页＋4 张（每组 5 页）</option>
+                <option value="6">主题页＋6 张（每组 7 页）</option>
+                <option value="9">主题页＋9 张（每组 10 页）</option>
+                <option value="12">主题页＋12 张（每组 13 页）</option>
+              </select>
+            </label>
+            <label id="batchVariantField" class="tool-field" for="batchVariant">
+              <span>排列样式</span>
+              <select id="batchVariant"></select>
+            </label>
+            <fieldset class="batch-pill-fieldset">
+              <legend>边距效果</legend>
+              <div class="batch-pill-options">
+                <label><input type="radio" name="batchEdgeStyle" value="flush" /><span>无边距</span></label>
+                <label><input type="radio" name="batchEdgeStyle" value="classic" checked /><span>经典边距</span></label>
+                <label><input type="radio" name="batchEdgeStyle" value="shadow" /><span>立体阴影</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="batch-pill-fieldset">
+              <legend>批量导出格式</legend>
+              <div class="batch-pill-options two-options">
+                <label><input type="radio" name="batchFormat" value="png" checked /><span>PNG 清晰</span></label>
+                <label><input type="radio" name="batchFormat" value="jpg" /><span>JPG 更小</span></label>
+              </div>
+            </fieldset>
+            <button id="renderBatchCollageButton" class="button primary tool-wide-button" type="button" disabled>生成分组预览</button>
+            <p id="batchGroupSummary" class="batch-group-summary" role="status" aria-live="polite">提取页面后可选择批量拼图。</p>
+          </div>
         </aside>
 
         <section class="tool-preview-card">
           <div class="tool-preview-heading">
-            <div><p class="eyebrow">PREVIEW · 1080 × 1440 · 竖版 3:4</p><h2>小红书商品封面</h2></div>
+            <div><p id="collagePreviewEyebrow" class="eyebrow">PREVIEW · 1080 × 1440 · 竖版 3:4</p><h2 id="collagePreviewTitle">小红书商品封面</h2></div>
             <div class="tool-export-actions">
               <button id="downloadCollageJpg" class="button ghost" type="button" disabled>导出 JPG</button>
               <button id="downloadCollagePng" class="button primary" type="button" disabled>导出 PNG</button>
+              <button id="downloadCollageZip" class="button primary batch-zip-button" type="button" disabled hidden>导出全部 ZIP</button>
             </div>
+          </div>
+          <div id="batchPreviewNav" class="batch-preview-nav" hidden>
+            <button id="previousBatchGroup" class="button ghost" type="button" disabled aria-label="预览上一组">上一组</button>
+            <span id="batchPreviewMeta">第 0 / 0 组</span>
+            <button id="nextBatchGroup" class="button ghost" type="button" disabled aria-label="预览下一组">下一组</button>
           </div>
           <div class="collage-canvas-stage">
             <canvas id="collageCanvas" width="1080" height="1440" aria-label="PPT 页面拼图预览"></canvas>
             <div id="collageCanvasEmpty" class="canvas-empty-state">
               <span class="empty-layout-mark" aria-hidden="true"><i></i><b></b><em></em></span>
-              <strong>提取页面后生成封面</strong>
-              <p>重点三图适合 6—14 页；主图＋课件矩阵建议至少 13 页。</p>
+              <strong id="collageEmptyTitle">提取页面后生成封面</strong>
+              <p id="collageEmptyHelp">重点三图适合 6—14 页；主图＋课件矩阵建议至少 13 页。</p>
+            </div>
+          </div>
+          <div id="batchPageToolbar" class="batch-page-toolbar" hidden>
+            <div><strong>选择参与拼图的页面</strong><small id="batchSelectionMeta">已选 0 页</small></div>
+            <div>
+              <button id="selectAllBatchPages" class="button ghost" type="button">全选</button>
+              <button id="invertBatchPages" class="button ghost" type="button">反选</button>
             </div>
           </div>
           <div id="collageThumbs" class="extracted-page-list" aria-label="已提取的 PPT 页面"></div>
@@ -891,11 +967,32 @@
               <label for="imageProvider">接口类型 <b>必填</b></label>
               <select id="imageProvider">
                 <option value="wukong">悟空 API · 生图组</option>
+                <option value="apimart">APIMart · GPT Image 2</option>
                 <option value="volcengine-seedream">火山方舟 · 豆包 Seedream 生图</option>
                 <option value="custom">其他兼容图片 API</option>
               </select>
               <small id="imageProviderHelp">选择服务商后，工具会自动填写正确的图片接口路径。</small>
             </div>
+
+            <div class="provider-presets field-wide" aria-label="常用图片服务快速切换">
+              <div id="wukongPreset" class="provider-preset">
+                <div>
+                  <strong>悟空 API</strong>
+                  <p>保留悟空 Key、模型和代理策略，继续使用直连优先、系统代理兜底。</p>
+                </div>
+                <button id="useWukongPreset" class="button ghost" type="button">切换使用</button>
+              </div>
+              <div id="apiMartPreset" class="provider-preset">
+                <div>
+                  <strong>APIMart</strong>
+                  <p>保留 APIMart Key，默认使用 GPT Image 2、16:9 与 1K 清晰度。</p>
+                </div>
+                <button id="useApiMartPreset" class="button ghost" type="button">切换使用</button>
+              </div>
+            </div>
+            <p class="provider-presets-note">
+              悟空和 APIMart 配置分别保存在当前浏览器，切换时不会互相覆盖 API Key。
+            </p>
 
             <div class="field field-wide">
               <label for="endpoint">API 服务地址 <b>必填</b></label>
@@ -1213,6 +1310,110 @@
       </div>
     </dialog>
 
+    <dialog
+      id="slideEditDialog"
+      class="api-dialog slide-edit-dialog"
+      aria-labelledby="slideEditDialogTitle"
+      aria-describedby="slideEditDialogDescription"
+    >
+      <div class="dialog-shell slide-edit-shell">
+        <header class="dialog-head">
+          <div class="dialog-title-group">
+            <div class="dialog-mark" aria-hidden="true">EDIT</div>
+            <div>
+              <p id="slideEditEyebrow" class="eyebrow">单页调整</p>
+              <h2 id="slideEditDialogTitle">修改本页页纲</h2>
+              <p id="slideEditDialogDescription">
+                仅调整当前页，其他已生成的页面和时光舱作品都会保留。
+              </p>
+            </div>
+          </div>
+          <button id="closeSlideEditDialog" class="close-button" type="button" aria-label="关闭单页编辑">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <div class="dialog-content slide-edit-content">
+          <section id="slideEditOutlineFields" class="slide-edit-fields" aria-label="本页页纲">
+            <div class="field">
+              <label for="slideEditTitle">页面标题</label>
+              <input id="slideEditTitle" type="text" autocomplete="off" placeholder="例如：青铜器为什么这么厉害？" />
+            </div>
+            <div class="field">
+              <label for="slideEditText">页面文字</label>
+              <textarea id="slideEditText" rows="7" spellcheck="false" placeholder="填写这张 PPT 需要展示的正文内容"></textarea>
+            </div>
+          </section>
+
+          <section id="slideEditStyleFields" class="slide-edit-fields" aria-label="本页风格和元素" hidden>
+            <div class="field">
+              <label for="slideEditStyle">画面风格</label>
+              <textarea id="slideEditStyle" rows="3" spellcheck="false" placeholder="例如：古朴国风插画、柔和暖色、博物馆质感"></textarea>
+            </div>
+            <div class="field">
+              <label for="slideEditElements">添加元素</label>
+              <textarea id="slideEditElements" rows="3" spellcheck="false" placeholder="例如：青铜鼎、云纹、古代工匠、时间轴"></textarea>
+            </div>
+            <div class="field">
+              <label for="slideEditExtra">补充要求 <span>选填</span></label>
+              <textarea id="slideEditExtra" rows="2" spellcheck="false" placeholder="例如：右侧留出文字位置，避免画面过于拥挤"></textarea>
+            </div>
+          </section>
+          <p class="slide-edit-note">保存后只有这一页需要重新生成；不会自动提交生图，也不会影响其他页面。</p>
+        </div>
+
+        <footer class="dialog-footer slide-edit-footer">
+          <p>修改会同步保存到页纲、逐页要求和当前时光舱作品。</p>
+          <div class="dialog-actions">
+            <button id="cancelSlideEditButton" class="button ghost" type="button">取消</button>
+            <button id="saveSlideEditButton" class="button primary" type="button">保存本页修改</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog
+      id="slideHistoryDialog"
+      class="api-dialog slide-history-dialog"
+      aria-labelledby="slideHistoryDialogTitle"
+      aria-describedby="slideHistoryDialogDescription"
+    >
+      <div class="dialog-shell slide-history-shell">
+        <header class="dialog-head">
+          <div class="dialog-title-group">
+            <div class="dialog-mark" aria-hidden="true">HIS</div>
+            <div>
+              <p id="slideHistoryEyebrow" class="eyebrow">单页历史</p>
+              <h2 id="slideHistoryDialogTitle">本页历史版本</h2>
+              <p id="slideHistoryDialogDescription">
+                同时恢复图片、页纲、风格和元素；仅影响这一页，不会再次调用图片接口。
+              </p>
+            </div>
+          </div>
+          <button id="closeSlideHistoryDialog" class="close-button" type="button" aria-label="关闭单页历史">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <div class="dialog-content slide-history-content">
+          <section id="slideHistoryCurrent" class="slide-history-current" aria-label="当前版本"></section>
+          <div class="slide-history-list-heading">
+            <h3>可以恢复的版本</h3>
+            <span id="slideHistoryCount">0 / 6 个历史版本</span>
+          </div>
+          <section id="slideHistoryList" class="slide-history-list" aria-label="可恢复的历史版本"></section>
+          <p class="slide-edit-note">恢复不会扣费；如果当前页已有图片，当前版本也会自动保留，之后还能切回来。</p>
+        </div>
+
+        <footer class="dialog-footer slide-history-footer">
+          <p>每一页最多保留最近 6 个版本，并随当前作品一起存入课件时光舱。</p>
+          <div class="dialog-actions">
+            <button id="closeSlideHistoryButton" class="button ghost" type="button">关闭</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
     <template id="slideTemplate">
       <article class="slide-card">
         <div class="slide-preview">
@@ -1232,6 +1433,11 @@
         <p class="slide-excerpt"></p>
         <p class="slide-direction"></p>
         <p class="slide-error" role="alert"></p>
+        <div class="slide-edit-actions" aria-label="单页编辑">
+          <button class="slide-edit-button" type="button" data-edit-mode="outline">修改页纲</button>
+          <button class="slide-edit-button" type="button" data-edit-mode="style">修改风格和元素</button>
+          <button class="slide-edit-button slide-history-button" type="button" disabled>暂无历史版本</button>
+        </div>
         <div class="slide-actions">
           <span class="retry-note">只生成这一页，不影响其他页面</span>
           <button class="retry-button" type="button">生成这一页</button>
@@ -1240,8 +1446,8 @@
     </template>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/app.js?v=20260818-wukong-migration1"></script>
+    <script type="module" src="/app.js?v=20260826-selective-sync-v1"></script>
     <script type="module" src="/note-tool.js?v=20260811-seeding-notes-v3"></script>
-    <script type="module" src="/tools.js?v=20260818-perspective-full-migration1"></script>
+    <script type="module" src="/tools.js?v=20260826-batch-collage-v1"></script>
   </body>
 </html>

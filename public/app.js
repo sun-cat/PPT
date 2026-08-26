@@ -1,15 +1,26 @@
 import { parseDeckScript } from "/script-parser.js";
-import { parsePageStyleScript } from "/style-parser.js";
+import {
+  getPageStyleFields,
+  parsePageStyleScript,
+  updatePageStyleScript,
+} from "/style-parser.js?v=20260826-slide-edit-v1";
+import {
+  MAX_SLIDE_HISTORY,
+  createSlideHistorySnapshot,
+  prepareSlideHistoryRestore,
+  prependSlideHistory,
+} from "/slide-history.js?v=20260826-slide-history-v1";
 import {
   apiSettingsForLocalStorage,
   imageProviderMode,
+  isApiMartEndpoint,
   isWukongStudioEndpoint,
   isVolcengineSeedreamEndpoint,
   normalizeWukongApiKey,
   normalizeStoredConnectionStatus,
   sanitizeProviderOverrides,
   wukongEndpointForDisplay,
-} from "/api-settings.js?v=20260815-wukong-proxy-fallback-v1";
+} from "/api-settings.js?v=20260826-apimart-profiles-v1";
 import {
   normalizeGenerationConcurrency,
   runConcurrentTasks,
@@ -26,8 +37,12 @@ const slideTemplate = $("#slideTemplate");
 const slideGrid = $("#slideGrid");
 const draftStorageKey = "visiondeck-draft-v1";
 const settingsStorageKey = "visiondeck-api-settings-v1";
+const providerProfilesStorageKey = "visiondeck-api-provider-profiles-v1";
 const concurrencyStorageKey = "visiondeck-generation-concurrency-v2";
 const WUKONG_RECOMMENDED_PRODUCT = "image_nanoBanana2";
+const WUKONG_ENDPOINT = "https://wkapi.work";
+const APIMART_ENDPOINT = "https://api.aiuxu.com/v1";
+const APIMART_MODEL = "gpt-image-2";
 const WUKONG_RECOMMENDED_PRODUCTS = new Set([
   "image_nanoBanana2",
   "image_gptImage2",
@@ -216,25 +231,48 @@ function updateWukongCostEstimate() {
 function refreshApiProviderGuidance() {
   const providerMode = imageProviderMode(apiFields.endpoint.value);
   const wukong = providerMode === "wukong";
+  const apimart = providerMode === "apimart";
   const volcengine = providerMode === "volcengine-seedream";
+  const apimartOfficial = apimart && /-official$/i.test(apiFields.model.value.trim());
   apiFields.provider.value = providerMode;
+  for (const [id, selected] of [
+    ["wukong", wukong],
+    ["apiMart", apimart],
+  ]) {
+    const preset = $(`#${id}Preset`);
+    const presetButton = $(`#use${id[0].toUpperCase()}${id.slice(1)}Preset`);
+    preset?.classList.toggle("is-selected", selected);
+    presetButton?.classList.toggle("selected", selected);
+    if (presetButton) {
+      presetButton.textContent = selected ? "当前使用" : "切换使用";
+      presetButton.setAttribute("aria-pressed", String(selected));
+    }
+  }
   $("#seedreamModelField").hidden = !volcengine;
   if (volcengine) refreshSeedreamModelSelection();
   $("#endpointHelp").textContent = wukong
     ? "学员只需填写 https://wkapi.work；系统会在后台自动使用悟空生图路径。"
-    : volcengine
-      ? "火山方舟填写官方 Base URL；工具会自动使用 /api/v3/images/generations。"
-      : "填写服务商提供的图片 API Base URL，工具会自动补全标准生图路径。";
+    : apimart
+      ? "APIMart 国内接口地址：https://api.aiuxu.com/v1；系统会自动提交任务并轮询取图。"
+      : volcengine
+        ? "火山方舟填写官方 Base URL；工具会自动使用 /api/v3/images/generations。"
+        : "填写服务商提供的图片 API Base URL，工具会自动补全标准生图路径。";
   $("#autoConfigTitle").textContent = wukong
     ? "已识别悟空创作台"
-    : volcengine
-      ? "已识别火山方舟豆包生图"
-      : "普通使用只需填写以上两项";
+    : apimart
+      ? "已识别 APIMart"
+      : volcengine
+        ? "已识别火山方舟豆包生图"
+        : "普通使用只需填写以上两项";
   $("#autoConfigMessage").textContent = wukong
     ? "请选择具体生图模型；系统会先直连悟空接口，失败时自动切换系统代理，并保留已提交任务供继续取回。"
-    : volcengine
-      ? "系统只调用 Seedream 图片生成接口；参考图会按豆包格式发送，并固定一次生成一张 16:9 课件图。"
-      : "检测地址、图片生成地址、参考图接口和网络代理均由系统自动判断。";
+    : apimart
+      ? apimartOfficial
+        ? "当前使用官方通道 gpt-image-2-official；质量与 Token 用量会影响最终费用。"
+        : "当前使用低价固定计费通道。API 模型名是 gpt-image-2；系统会异步提交并自动取回结果。"
+      : volcengine
+        ? "系统只调用 Seedream 图片生成接口；参考图会按豆包格式发送，并固定一次生成一张 16:9 课件图。"
+        : "检测地址、图片生成地址、参考图接口和网络代理均由系统自动判断。";
   $("#modelLabel").textContent = wukong
     ? "悟空产品 ID"
     : volcengine
@@ -242,15 +280,19 @@ function refreshApiProviderGuidance() {
       : "模型名称";
   $("#modelHelp").textContent = wukong
     ? "具体产品由上方“生图模型”控制，不需要手动填写 product_id。"
-    : volcengine
-      ? "已由上方“豆包图片模型”同步；自定义时可填写 Seedream Model ID 或 ep-...。"
-      : "默认使用 GPT Image 2，一般不需要修改。";
-  $("#sizeLabel").textContent = wukong ? "输出比例" : "画面尺寸";
+    : apimart
+      ? "低价通道填写 gpt-image-2；官方通道填写 gpt-image-2-official。"
+      : volcengine
+        ? "已由上方“豆包图片模型”同步；自定义时可填写 Seedream Model ID 或 ep-...。"
+        : "默认使用 GPT Image 2，一般不需要修改。";
+  $("#sizeLabel").textContent = wukong || apimart ? "输出比例" : "画面尺寸";
   $("#sizeHelp").textContent = wukong
     ? "课件固定使用 16:9；悟空接口不接收 1536x1024 等像素尺寸。"
-    : volcengine
-      ? "豆包默认使用 2560×1440，保持 16:9 横版。"
-      : "标准 16:9 横版，适合整页 PPT。";
+    : apimart
+      ? "APIMart 使用比例值 16:9；清晰度由额外参数 resolution 控制，默认 1K。"
+      : volcengine
+        ? "豆包默认使用 2560×1440，保持 16:9 横版。"
+        : "标准 16:9 横版，适合整页 PPT。";
   for (const id of ["qualityField", "testEndpointField", "editEndpointField"]) {
     const element = $(`#${id}`);
     element.hidden = wukong || volcengine;
@@ -287,10 +329,18 @@ function applyImageProviderPreset(provider, { clearKey = true } = {}) {
   })();
   const presets = {
     wukong: {
-      endpoint: "https://wkapi.work",
+      endpoint: WUKONG_ENDPOINT,
       model: "image_nanoBanana2",
       size: "16:9",
       quality: "high",
+      extraBody: "",
+    },
+    apimart: {
+      endpoint: APIMART_ENDPOINT,
+      model: APIMART_MODEL,
+      size: "16:9",
+      quality: "",
+      extraBody: '{"resolution":"1k"}',
     },
     "volcengine-seedream": {
       endpoint: "https://ark.cn-beijing.volces.com/api/v3",
@@ -308,6 +358,7 @@ function applyImageProviderPreset(provider, { clearKey = true } = {}) {
     for (const key of ["editEndpoint", "testEndpoint", "extraBody", "extraHeaders"]) {
       apiFields[key].value = "";
     }
+    apiFields.extraBody.value = preset.extraBody || "";
     if (clearKey && previousOrigin && previousOrigin !== new URL(preset.endpoint).origin) {
       apiFields.apiKey.value = "";
       resetApiKeyVisibility();
@@ -357,6 +408,8 @@ let archiveSaveChain = Promise.resolve();
 let archiveStorageWarningShown = false;
 const archiveImageBlobCache = new WeakMap();
 let archiveReferenceBlobCache = null;
+let editingSlideId = null;
+let editingSlideMode = "";
 
 const stepMeta = {
   1: {
@@ -637,6 +690,7 @@ function newSlide(page) {
     status: "idle",
     error: "",
     pendingTask: null,
+    history: [],
   };
 }
 
@@ -703,10 +757,375 @@ function renderSlides() {
         : `生成第 ${slide.pageNumber} 页`,
     );
     retry.addEventListener("click", () => generateOne(slide.id));
+    for (const button of card.querySelectorAll(".slide-edit-button[data-edit-mode]")) {
+      button.disabled =
+        slide.status === "working" ||
+        Boolean(slide.pendingTask) ||
+        busy ||
+        sourceDirty ||
+        styleDirty;
+      const mode = button.dataset.editMode;
+      button.setAttribute(
+        "aria-label",
+        mode === "outline"
+          ? `修改第 ${slide.pageNumber} 页的页纲`
+          : `修改第 ${slide.pageNumber} 页的风格和元素`,
+      );
+      button.addEventListener("click", () => openSlideEditDialog(slide.id, mode));
+    }
+    const historyButton = $(".slide-history-button", card);
+    const historyCount = slide.history?.length || 0;
+    historyButton.textContent = historyCount
+      ? `查看历史版本（${historyCount}）`
+      : "暂无历史版本";
+    historyButton.disabled =
+      !historyCount ||
+      slide.status === "working" ||
+      Boolean(slide.pendingTask) ||
+      busy ||
+      sourceDirty ||
+      styleDirty;
+    historyButton.setAttribute(
+      "aria-label",
+      historyCount
+        ? `查看第 ${slide.pageNumber} 页的 ${historyCount} 个历史版本`
+        : `第 ${slide.pageNumber} 页暂无历史版本`,
+    );
+    historyButton.addEventListener("click", () => openSlideHistoryDialog(slide.id));
     slideGrid.appendChild(fragment);
   });
   updateProgress();
   updateWukongCostEstimate();
+}
+
+function openSlideEditDialog(id, mode) {
+  const slide = slides.find((item) => item.id === id);
+  if (!slide || slide.status === "working" || slide.pendingTask || busy) return;
+  if (sourceDirty || styleDirty) {
+    toast(sourceDirty ? "请先重新识别页纲" : "请先重新应用逐页要求");
+    return;
+  }
+
+  editingSlideId = id;
+  editingSlideMode = mode === "style" ? "style" : "outline";
+  const isOutline = editingSlideMode === "outline";
+  $("#slideEditEyebrow").textContent = `PAGE ${String(slide.pageNumber).padStart(2, "0")} · 单页调整`;
+  $("#slideEditDialogTitle").textContent = isOutline ? "修改本页页纲" : "修改本页风格和元素";
+  $("#slideEditOutlineFields").hidden = !isOutline;
+  $("#slideEditStyleFields").hidden = isOutline;
+
+  if (isOutline) {
+    $("#slideEditTitle").value = slide.title || "";
+    $("#slideEditText").value = slide.pageText || "";
+  } else {
+    try {
+      const fields = getPageStyleFields(projectFields.pageStyleInput.value, slide.pageNumber);
+      $("#slideEditStyle").value = fields.style;
+      $("#slideEditElements").value = fields.elements;
+      $("#slideEditExtra").value = fields.extra;
+    } catch (error) {
+      editingSlideId = null;
+      editingSlideMode = "";
+      toast(error.message);
+      return;
+    }
+  }
+
+  $("#slideEditDialog").showModal();
+  (isOutline ? $("#slideEditTitle") : $("#slideEditStyle")).focus();
+}
+
+function closeSlideEditDialog() {
+  $("#slideEditDialog").close();
+}
+
+function rememberSlideHistory(slide) {
+  const styleFields = getPageStyleFields(
+    projectFields.pageStyleInput.value,
+    slide.pageNumber,
+  );
+  const snapshot = createSlideHistorySnapshot(slide, styleFields);
+  if (!snapshot) return false;
+  const cached = archiveImageBlobCache.get(slide);
+  if (cached?.source === snapshot.imageDataUrl) {
+    archiveImageBlobCache.set(snapshot, cached);
+  }
+  slide.history = prependSlideHistory(slide.history, snapshot);
+  return true;
+}
+
+function updatePageStyleSummary(parsed) {
+  const knownPages = new Set(slides.map((item) => Number(item.pageNumber)));
+  const styledPages = new Set(
+    parsed.pages
+      .filter((page) => page.prompt && knownPages.has(page.pageNumber))
+      .map((page) => page.pageNumber),
+  );
+  $("#styledPageCount").textContent = `${styledPages.size} 页`;
+  $("#styleParseHint").className = "parse-hint";
+  $("#styleParseHint").textContent = styledPages.size
+    ? `已应用 ${styledPages.size} 页特殊要求`
+    : "未填写逐页要求，将由系统自动设计";
+  showStyleWarnings(parsed.warnings);
+}
+
+function resetEditedSlide(slide) {
+  archiveImageBlobCache.delete(slide);
+  slide.imageDataUrl = "";
+  slide.prompt = "";
+  slide.status = "idle";
+  slide.error = "";
+}
+
+function saveSlideEdit() {
+  const slide = slides.find((item) => item.id === editingSlideId);
+  if (!slide || slide.status === "working" || slide.pendingTask || busy) return;
+
+  let changed = false;
+  if (editingSlideMode === "outline") {
+    const title = $("#slideEditTitle").value.trim();
+    const pageText = $("#slideEditText").value.trim();
+    if (!title && !pageText) {
+      toast("请至少填写页面标题或页面文字");
+      $("#slideEditTitle").focus();
+      return;
+    }
+    changed = title !== slide.title || pageText !== slide.pageText;
+    if (changed) {
+      rememberSlideHistory(slide);
+      slide.title = title;
+      slide.pageText = pageText;
+      projectFields.scriptInput.value = slidesToScript(slides);
+      sourceDirty = false;
+      $("#parseHint").className = "parse-hint";
+      $("#parseHint").textContent = `已识别 ${slides.length} 页，可以开始生成`;
+      $("#outlineCount").textContent = `${slides.length} 页`;
+    }
+  } else if (editingSlideMode === "style") {
+    try {
+      const nextScript = updatePageStyleScript(
+        projectFields.pageStyleInput.value,
+        slide.pageNumber,
+        {
+          style: $("#slideEditStyle").value,
+          elements: $("#slideEditElements").value,
+          extra: $("#slideEditExtra").value,
+        },
+      );
+      const parsed = parsePageStyleScript(nextScript);
+      const nextPrompt = parsed.pages
+        .filter((page) => page.pageNumber === Number(slide.pageNumber))
+        .map((page) => page.prompt)
+        .filter(Boolean)
+        .join("\n\n");
+      changed = nextPrompt !== slide.pageStylePrompt;
+      if (changed || nextScript !== projectFields.pageStyleInput.value) {
+        if (changed) rememberSlideHistory(slide);
+        projectFields.pageStyleInput.value = nextScript;
+        slide.pageStylePrompt = nextPrompt;
+        styleDirty = false;
+        updatePageStyleSummary(parsed);
+      }
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+  }
+
+  const mode = editingSlideMode;
+  closeSlideEditDialog();
+  if (!changed) {
+    saveDraft();
+    toast("本页内容没有变化，已保留现有画面");
+    return;
+  }
+
+  resetEditedSlide(slide);
+  renderSlides();
+  saveDraft();
+  scheduleArchiveSave();
+  toast(
+    mode === "outline"
+      ? `第 ${slide.pageNumber} 页页纲已更新，仅需重新生成这一页`
+      : `第 ${slide.pageNumber} 页风格和元素已更新，仅需重新生成这一页`,
+  );
+}
+
+function formatSlideHistoryTime(timestamp) {
+  if (!timestamp) return "刚刚保存";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function appendSlideHistoryDetail(container, label, value) {
+  if (!value) return;
+  const detail = document.createElement("p");
+  detail.className = "slide-history-detail";
+  const heading = document.createElement("strong");
+  heading.textContent = `${label}：`;
+  detail.append(heading, document.createTextNode(value));
+  container.appendChild(detail);
+}
+
+function createSlideHistoryCard(slide, version, { current = false, index = 0 } = {}) {
+  const card = document.createElement("article");
+  card.className = `slide-history-card${current ? " current" : ""}`;
+
+  const preview = document.createElement("div");
+  preview.className = "slide-history-preview";
+  if (version.imageDataUrl) {
+    const image = document.createElement("img");
+    image.src = version.imageDataUrl;
+    image.alt = current ? "当前版本图片预览" : `第 ${index + 1} 个历史版本图片预览`;
+    preview.appendChild(image);
+  } else {
+    preview.classList.add("empty");
+    preview.textContent = "当前页等待重新生成";
+  }
+
+  const content = document.createElement("div");
+  content.className = "slide-history-card-content";
+  const heading = document.createElement("div");
+  heading.className = "slide-history-card-heading";
+  const badge = document.createElement("span");
+  badge.className = `slide-history-badge${current ? " current" : ""}`;
+  badge.textContent = current ? "当前版本" : `历史版本 ${index + 1}`;
+  heading.appendChild(badge);
+  if (!current) {
+    const time = document.createElement("time");
+    time.textContent = formatSlideHistoryTime(version.createdAt);
+    heading.appendChild(time);
+  }
+  content.appendChild(heading);
+
+  const title = document.createElement("h3");
+  title.textContent = version.title || "未填写页面标题";
+  content.appendChild(title);
+  appendSlideHistoryDetail(content, "页面文字", version.pageText);
+  appendSlideHistoryDetail(content, "画面风格", version.styleFields?.style);
+  appendSlideHistoryDetail(content, "添加元素", version.styleFields?.elements);
+  appendSlideHistoryDetail(content, "补充要求", version.styleFields?.extra);
+
+  if (!current) {
+    const restore = document.createElement("button");
+    restore.className = "button primary slide-history-restore-button";
+    restore.type = "button";
+    restore.textContent = "恢复这个版本";
+    restore.setAttribute("aria-label", `恢复第 ${slide.pageNumber} 页历史版本 ${index + 1}`);
+    restore.addEventListener("click", () => restoreSlideHistoryVersion(slide.id, version.id));
+    content.appendChild(restore);
+  }
+
+  card.append(preview, content);
+  return card;
+}
+
+function renderSlideHistoryDialog(slide) {
+  const current = {
+    ...slide,
+    styleFields: getPageStyleFields(projectFields.pageStyleInput.value, slide.pageNumber),
+  };
+  $("#slideHistoryEyebrow").textContent = `PAGE ${String(slide.pageNumber).padStart(2, "0")} · 单页历史`;
+  $("#slideHistoryDialogTitle").textContent = `第 ${slide.pageNumber} 页历史版本`;
+  $("#slideHistoryCurrent").replaceChildren(
+    createSlideHistoryCard(slide, current, { current: true }),
+  );
+  const list = $("#slideHistoryList");
+  list.replaceChildren();
+  slide.history.forEach((version, index) => {
+    list.appendChild(createSlideHistoryCard(slide, version, { index }));
+  });
+  $("#slideHistoryCount").textContent = `${slide.history.length} / ${MAX_SLIDE_HISTORY} 个历史版本`;
+}
+
+function openSlideHistoryDialog(id) {
+  const slide = slides.find((item) => item.id === id);
+  if (
+    !slide?.history?.length ||
+    slide.status === "working" ||
+    slide.pendingTask ||
+    busy ||
+    sourceDirty ||
+    styleDirty
+  ) {
+    return;
+  }
+
+  try {
+    renderSlideHistoryDialog(slide);
+    $("#slideHistoryDialog").showModal();
+  } catch (error) {
+    toast(error.message || "无法读取本页历史版本");
+  }
+}
+
+function closeSlideHistoryDialog() {
+  $("#slideHistoryDialog").close();
+}
+
+function restoreSlideHistoryVersion(slideId, historyId) {
+  const slide = slides.find((item) => item.id === slideId);
+  if (!slide || slide.status === "working" || slide.pendingTask || busy) return;
+
+  try {
+    const currentStyle = getPageStyleFields(
+      projectFields.pageStyleInput.value,
+      slide.pageNumber,
+    );
+    const { selected, history } = prepareSlideHistoryRestore(
+      slide,
+      historyId,
+      currentStyle,
+    );
+    const nextStyleScript = updatePageStyleScript(
+      projectFields.pageStyleInput.value,
+      slide.pageNumber,
+      selected.styleFields || {},
+    );
+    const parsed = parsePageStyleScript(nextStyleScript);
+    const nextPrompt = parsed.pages
+      .filter((page) => page.pageNumber === Number(slide.pageNumber))
+      .map((page) => page.prompt)
+      .filter(Boolean)
+      .join("\n\n");
+
+    archiveImageBlobCache.delete(slide);
+    const cached = archiveImageBlobCache.get(selected);
+    if (cached?.source === selected.imageDataUrl) {
+      archiveImageBlobCache.set(slide, cached);
+    }
+    slide.history = history;
+    slide.title = selected.title || "";
+    slide.pageText = selected.pageText || "";
+    slide.visualPrompt = selected.visualPrompt || "";
+    slide.pageStylePrompt = nextPrompt;
+    slide.prompt = selected.prompt || "";
+    slide.imageDataUrl = selected.imageDataUrl;
+    slide.status = "success";
+    slide.error = "";
+    slide.pendingTask = null;
+
+    projectFields.scriptInput.value = slidesToScript(slides);
+    projectFields.pageStyleInput.value = nextStyleScript;
+    sourceDirty = false;
+    styleDirty = false;
+    $("#parseHint").className = "parse-hint";
+    $("#parseHint").textContent = `已识别 ${slides.length} 页，可以开始生成`;
+    $("#outlineCount").textContent = `${slides.length} 页`;
+    updatePageStyleSummary(parsed);
+
+    closeSlideHistoryDialog();
+    renderSlides();
+    saveDraft();
+    scheduleArchiveSave();
+    toast(`第 ${slide.pageNumber} 页已恢复历史版本，无需重新生成`);
+  } catch (error) {
+    toast(error.message || "恢复历史版本失败");
+  }
 }
 
 function showWarnings(warnings) {
@@ -954,22 +1373,75 @@ function collectApiSettings() {
   return applyProviderSafety().settings;
 }
 
+function providerProfileId(endpoint = apiFields.endpoint.value) {
+  if (isWukongStudioEndpoint(endpoint)) return "wukong";
+  if (isApiMartEndpoint(endpoint)) return "apimart";
+  return "";
+}
+
+function currentConnectionStatus() {
+  return connectionVerified
+    ? "verified"
+    : connectionReachable
+      ? "reachable"
+      : connectionConfigured
+        ? "configured"
+        : "pending";
+}
+
+function readProviderProfiles() {
+  try {
+    const profiles = JSON.parse(localStorage.getItem(providerProfilesStorageKey) || "{}");
+    return profiles && typeof profiles === "object" && !Array.isArray(profiles) ? profiles : {};
+  } catch {
+    return {};
+  }
+}
+
+function providerDefaults(providerId) {
+  const common = {
+    editEndpoint: "",
+    apiKey: "",
+    quality: "",
+    proxyUrl: "",
+    useSystemProxyForWukong: false,
+    testEndpoint: "",
+    extraHeaders: "",
+    connectionStatus: "pending",
+  };
+  return providerId === "wukong"
+    ? {
+        ...common,
+        endpoint: WUKONG_ENDPOINT,
+        model: WUKONG_RECOMMENDED_PRODUCT,
+        size: "16:9",
+        extraBody: "",
+      }
+    : {
+        ...common,
+        endpoint: APIMART_ENDPOINT,
+        model: APIMART_MODEL,
+        size: "16:9",
+        extraBody: '{"resolution":"1k"}',
+      };
+}
+
 function persistApiSettings() {
   const settings = collectApiSettings();
+  const storedSettings = apiSettingsForLocalStorage(settings, {
+    connectionStatus: currentConnectionStatus(),
+  });
   localStorage.setItem(
     settingsStorageKey,
-    JSON.stringify(
-      apiSettingsForLocalStorage(settings, {
-        connectionStatus: connectionVerified
-          ? "verified"
-          : connectionReachable
-            ? "reachable"
-            : connectionConfigured
-              ? "configured"
-              : "pending",
-      }),
-    ),
+    JSON.stringify(storedSettings),
   );
+  const profileId = providerProfileId(settings.endpoint);
+  if (profileId) {
+    const profiles = readProviderProfiles();
+    profiles[profileId] = storedSettings;
+    localStorage.setItem(providerProfilesStorageKey, JSON.stringify(profiles));
+  }
+  return storedSettings;
 }
 
 function applyApiSettings(settings = {}) {
@@ -995,12 +1467,58 @@ function applyApiSettings(settings = {}) {
   refreshApiProviderGuidance();
 }
 
+function switchApiProvider(providerId) {
+  if (!new Set(["wukong", "apimart"]).has(providerId)) return;
+  const currentProviderId = providerProfileId();
+  if (currentProviderId) persistApiSettings();
+
+  const profiles = readProviderProfiles();
+  const settings = profiles[providerId] || providerDefaults(providerId);
+  applyApiSettings(settings);
+  lastApiEndpoint = settings.endpoint;
+  const status = normalizeStoredConnectionStatus(settings.connectionStatus);
+  connectionVerified = status === "verified";
+  connectionReachable = ["verified", "reachable"].includes(status);
+  connectionConfigured = Boolean(settings.endpoint);
+  persistApiSettings();
+  resetApiKeyVisibility();
+
+  const providerName = providerId === "wukong" ? "悟空 API" : "APIMart";
+  const restored = Boolean(profiles[providerId]);
+  setConnectionState(
+    connectionVerified ? "verified" : connectionReachable ? "reachable" : "warning",
+    connectionVerified
+      ? `${providerName} 已连接`
+      : connectionReachable
+        ? `${providerName} 可访问`
+        : `${providerName} 待检测`,
+  );
+  setTestResult(
+    "neutral",
+    restored
+      ? `已切换到 ${providerName}，并恢复这台电脑保存的独立配置`
+      : `已切换到 ${providerName}；粘贴该平台的 API Key 后点击“检测连接”`,
+  );
+  if (apiFields.apiKey.value) $("#testConnectionButton").focus({ preventScroll: true });
+  else apiFields.apiKey.focus({ preventScroll: true });
+}
+
+function selectImageProvider(providerId) {
+  if (["wukong", "apimart"].includes(providerId)) {
+    switchApiProvider(providerId);
+    return;
+  }
+  if (providerProfileId()) persistApiSettings();
+  applyImageProviderPreset(providerId);
+}
+
 function clearApiSettings() {
   const confirmed = window.confirm(
-    "确定清除保存在这台电脑上的 API 地址、API Key 和高级设置吗？清除后需要重新填写。",
+    "确定清除保存在这台电脑上的全部图片 API 地址、API Key 和高级设置吗？清除后需要重新填写。",
   );
   if (!confirmed) return;
   localStorage.removeItem(settingsStorageKey);
+  localStorage.removeItem(providerProfilesStorageKey);
   const defaults = {
     endpoint: "",
     editEndpoint: "",
@@ -1169,6 +1687,8 @@ async function testConnection() {
           ? "已自动匹配悟空生图路径"
           : body.providerMode === "volcengine-seedream"
             ? "已自动匹配豆包 Seedream 生图路径"
+            : body.providerMode === "apimart"
+              ? "已自动匹配 APIMart 异步生图路径"
             : "已匹配图片生成路径",
       );
     }
@@ -1325,6 +1845,7 @@ async function generateOne(id, { silent = false, onBatchHalt = null } = {}) {
         existingWukongTask: slide.pendingTask,
       }),
     });
+    if (previousImageDataUrl) rememberSlideHistory(slide);
     slide.imageDataUrl = body.imageDataUrl;
     slide.prompt = body.prompt;
     slide.status = "success";
@@ -1506,7 +2027,7 @@ async function archiveBlobForSlide(slide) {
 async function buildCurrentArchive() {
   const completed = slides.filter((slide) => slide.status === "success" && slide.imageDataUrl);
   const hasPendingTasks = slides.some((slide) => slide.pendingTask?.taskId);
-  if (!completed.length && !hasPendingTasks) return null;
+  if (!completed.length && !hasPendingTasks && !activeArchiveId) return null;
 
   const now = Date.now();
   if (!activeArchiveId) activeArchiveId = createArchiveId();
@@ -1514,6 +2035,21 @@ async function buildCurrentArchive() {
 
   const storedSlides = [];
   for (const slide of slides) {
+    const storedHistory = [];
+    for (const version of (slide.history || []).slice(0, MAX_SLIDE_HISTORY)) {
+      if (!version.imageDataUrl) continue;
+      storedHistory.push({
+        id: version.id,
+        createdAt: version.createdAt,
+        title: version.title,
+        pageText: version.pageText,
+        visualPrompt: version.visualPrompt,
+        pageStylePrompt: version.pageStylePrompt,
+        prompt: version.prompt,
+        styleFields: version.styleFields,
+        imageBlob: await archiveBlobForSlide(version),
+      });
+    }
     storedSlides.push({
       pageNumber: slide.pageNumber,
       title: slide.title,
@@ -1524,6 +2060,7 @@ async function buildCurrentArchive() {
       pendingTask: slide.pendingTask || null,
       status: slide.status === "success" && slide.imageDataUrl ? "success" : "idle",
       imageBlob: slide.imageDataUrl ? await archiveBlobForSlide(slide) : null,
+      history: storedHistory,
     });
   }
 
@@ -1561,7 +2098,7 @@ async function buildCurrentArchive() {
     pageCount: slides.length,
     completedCount: completed.length,
     complete,
-    coverDataUrl: completed.length ? await createArchiveThumbnail(completed[0].imageDataUrl) : "",
+    coverDataUrl: completed[0] ? await createArchiveThumbnail(completed[0].imageDataUrl) : "",
   };
   return { project, summary };
 }
@@ -1606,7 +2143,12 @@ async function saveCurrentArchive({ notify = false } = {}) {
 }
 
 function scheduleArchiveSave() {
-  if (!slides.some((slide) => slide.imageDataUrl || slide.pendingTask?.taskId)) return;
+  if (
+    !slides.some((slide) => slide.imageDataUrl || slide.pendingTask?.taskId) &&
+    !activeArchiveId
+  ) {
+    return;
+  }
   clearTimeout(archiveSaveTimer);
   archiveSaveTimer = setTimeout(() => {
     archiveSaveChain = archiveSaveChain
@@ -1937,6 +2479,27 @@ async function restoreArchiveProject(id, button) {
       slide.pageStylePrompt = saved.pageStylePrompt || slide.pageStylePrompt;
       slide.error = "";
       slide.pendingTask = saved.pendingTask || null;
+      slide.history = [];
+      for (const version of (saved.history || []).slice(0, MAX_SLIDE_HISTORY)) {
+        if (!version.imageBlob) continue;
+        const imageDataUrl = await blobToDataUrl(version.imageBlob);
+        const restoredVersion = {
+          id: version.id || createArchiveId(),
+          createdAt: Number(version.createdAt || 0),
+          title: version.title || "",
+          pageText: version.pageText || "",
+          visualPrompt: version.visualPrompt || "",
+          pageStylePrompt: version.pageStylePrompt || "",
+          prompt: version.prompt || "",
+          styleFields: version.styleFields || {},
+          imageDataUrl,
+        };
+        archiveImageBlobCache.set(restoredVersion, {
+          source: imageDataUrl,
+          blob: version.imageBlob,
+        });
+        slide.history.push(restoredVersion);
+      }
       if (saved.imageBlob) {
         slide.imageDataUrl = await blobToDataUrl(saved.imageBlob);
         slide.status = "success";
@@ -2095,8 +2658,10 @@ $("#saveApiSettingsButton").addEventListener("click", saveApiSettings);
 $("#clearApiSettingsButton").addEventListener("click", clearApiSettings);
 $("#testConnectionButton").addEventListener("click", testConnection);
 apiFields.provider.addEventListener("change", () => {
-  applyImageProviderPreset(apiFields.provider.value);
+  selectImageProvider(apiFields.provider.value);
 });
+$("#useWukongPreset")?.addEventListener("click", () => switchApiProvider("wukong"));
+$("#useApiMartPreset")?.addEventListener("click", () => switchApiProvider("apimart"));
 $("#wukongProduct").addEventListener("change", (event) => {
   apiFields.model.value = event.target.value;
   updateWukongCostEstimate();
@@ -2131,6 +2696,11 @@ apiFields.endpoint.addEventListener("input", () => {
 $("#archiveButton").addEventListener("click", openArchiveDialog);
 $("#closeArchiveDialog").addEventListener("click", closeArchiveDialog);
 $("#archiveCloseButton").addEventListener("click", closeArchiveDialog);
+$("#closeSlideEditDialog").addEventListener("click", closeSlideEditDialog);
+$("#cancelSlideEditButton").addEventListener("click", closeSlideEditDialog);
+$("#saveSlideEditButton").addEventListener("click", saveSlideEdit);
+$("#closeSlideHistoryDialog").addEventListener("click", closeSlideHistoryDialog);
+$("#closeSlideHistoryButton").addEventListener("click", closeSlideHistoryDialog);
 $("#parseButton").addEventListener("click", () => parseSource());
 $("#exampleButton").addEventListener("click", fillExample);
 $("#clearButton").addEventListener("click", clearProject);
@@ -2217,6 +2787,16 @@ $("#apiDialog").addEventListener("close", resetApiKeyVisibility);
 $("#archiveDialog").addEventListener("click", (event) => {
   if (event.target === $("#archiveDialog")) closeArchiveDialog();
 });
+$("#slideEditDialog").addEventListener("click", (event) => {
+  if (event.target === $("#slideEditDialog")) closeSlideEditDialog();
+});
+$("#slideEditDialog").addEventListener("close", () => {
+  editingSlideId = null;
+  editingSlideMode = "";
+});
+$("#slideHistoryDialog").addEventListener("click", (event) => {
+  if (event.target === $("#slideHistoryDialog")) closeSlideHistoryDialog();
+});
 projectFields.scriptInput.addEventListener("input", markSourceDirty);
 projectFields.pageStyleInput.addEventListener("input", markStyleDirty);
 projectFields.deckTitle.addEventListener("input", () => {
@@ -2240,6 +2820,7 @@ referenceFields.instruction.addEventListener("change", () => {
 });
 
 for (const field of Object.values(apiFields)) {
+  if (field === apiFields.provider) continue;
   const eventName = field.tagName === "SELECT" ? "change" : "input";
   field.addEventListener(eventName, () => {
     if (field === apiFields.endpoint) refreshApiProviderGuidance();

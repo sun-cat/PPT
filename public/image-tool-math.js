@@ -101,6 +101,211 @@ export function computeShowcaseCollageLayout(width, height, gridPageCount = 12) 
   };
 }
 
+export function chunkSequential(items, size) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const safeSize = Math.max(1, Math.floor(Number(size) || 1));
+  const groups = [];
+  for (let index = 0; index < safeItems.length; index += safeSize) {
+    groups.push(safeItems.slice(index, index + safeSize));
+  }
+  return groups;
+}
+
+export function getBatchCollageGroupSize(layout = "theme-grid", gridCount = 4) {
+  if (layout === "theme-grid") {
+    return [4, 6, 9, 12].includes(Number(gridCount)) ? 1 + Number(gridCount) : 5;
+  }
+  const sizes = { two: 2, three: 3, four: 4, five: 5 };
+  return sizes[layout] || 5;
+}
+
+function batchEdgeMetrics(width, edgeStyle) {
+  if (edgeStyle === "flush") {
+    return { outer: 4, gap: 5, radius: 2, shadow: false };
+  }
+  if (edgeStyle === "shadow") {
+    return {
+      outer: Math.round(width * 0.044),
+      gap: Math.round(width * 0.026),
+      radius: Math.round(width * 0.014),
+      shadow: true,
+    };
+  }
+  return {
+    outer: Math.round(width * 0.026),
+    gap: Math.round(width * 0.016),
+    radius: Math.round(width * 0.008),
+    shadow: false,
+  };
+}
+
+function centeredRows(height, rowHeights, gap) {
+  const totalHeight = rowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0)
+    + gap * Math.max(0, rowHeights.length - 1);
+  let y = (height - totalHeight) / 2;
+  return rowHeights.map((rowHeight) => {
+    const rowY = y;
+    y += rowHeight + gap;
+    return rowY;
+  });
+}
+
+function makeSlot(x, y, width) {
+  return { x, y, width, height: width * 9 / 16 };
+}
+
+function gridSlots(width, columns, count, x, y, gap) {
+  const tileWidth = (width - gap * (columns - 1)) / columns;
+  const tileHeight = tileWidth * 9 / 16;
+  return Array.from({ length: count }, (_, index) => ({
+    x: x + (index % columns) * (tileWidth + gap),
+    y: y + Math.floor(index / columns) * (tileHeight + gap),
+    width: tileWidth,
+    height: tileHeight,
+  }));
+}
+
+export function computeBatchCollageLayout(
+  width,
+  height,
+  {
+    layout = "theme-grid",
+    variant = "default",
+    itemCount,
+    gridCount = 4,
+    edgeStyle = "classic",
+  } = {},
+) {
+  const safeWidth = Math.max(1, Number(width) || 1080);
+  const safeHeight = Math.max(1, Number(height) || 1440);
+  const metrics = batchEdgeMetrics(safeWidth, edgeStyle);
+  const innerWidth = safeWidth - metrics.outer * 2;
+  const fullHeight = innerWidth * 9 / 16;
+  const maxCount = getBatchCollageGroupSize(layout, gridCount);
+  const count = Math.max(0, Math.min(maxCount, Number(itemCount) || maxCount));
+  let slots = [];
+
+  if (layout === "theme-grid") {
+    const normalizedGridCount = [4, 6, 9, 12].includes(Number(gridCount))
+      ? Number(gridCount)
+      : 4;
+    const gridItems = Math.max(0, Math.min(normalizedGridCount, count - 1));
+    const columns = normalizedGridCount === 4 ? 2 : 3;
+    const tileWidth = (innerWidth - metrics.gap * (columns - 1)) / columns;
+    const tileHeight = tileWidth * 9 / 16;
+    const rows = Math.ceil(gridItems / columns);
+    const contentHeight = fullHeight
+      + (gridItems ? metrics.gap + rows * tileHeight + Math.max(0, rows - 1) * metrics.gap : 0);
+    const top = Math.max(metrics.outer, (safeHeight - contentHeight) / 2);
+    if (count) slots.push(makeSlot(metrics.outer, top, innerWidth));
+    if (gridItems) {
+      slots.push(...gridSlots(
+        innerWidth,
+        columns,
+        gridItems,
+        metrics.outer,
+        top + fullHeight + metrics.gap,
+        metrics.gap,
+      ));
+    }
+  } else if (layout === "two") {
+    if (variant === "side-by-side") {
+      const tileWidth = (innerWidth - metrics.gap) / 2;
+      const tileHeight = tileWidth * 9 / 16;
+      const top = (safeHeight - tileHeight) / 2;
+      slots = gridSlots(innerWidth, 2, count, metrics.outer, top, metrics.gap);
+    } else if (variant === "offset") {
+      const tileWidth = innerWidth * 0.78;
+      const tileHeight = tileWidth * 9 / 16;
+      const step = tileHeight * 0.68;
+      const top = (safeHeight - tileHeight - step * Math.max(0, count - 1)) / 2;
+      slots = Array.from({ length: count }, (_, index) => makeSlot(
+        index % 2 ? safeWidth - metrics.outer - tileWidth : metrics.outer,
+        top + index * step,
+        tileWidth,
+      ));
+    } else {
+      const rowYs = centeredRows(safeHeight, Array(count).fill(fullHeight), metrics.gap);
+      slots = rowYs.map((y) => makeSlot(metrics.outer, y, innerWidth));
+    }
+  } else if (layout === "three") {
+    if (variant === "hero-bottom") {
+      const tileWidth = (innerWidth - metrics.gap) / 2;
+      const tileHeight = tileWidth * 9 / 16;
+      const rowYs = centeredRows(safeHeight, [tileHeight, fullHeight], metrics.gap);
+      slots = [
+        ...gridSlots(innerWidth, 2, Math.min(2, count), metrics.outer, rowYs[0], metrics.gap),
+        ...(count > 2 ? [makeSlot(metrics.outer, rowYs[1], innerWidth)] : []),
+      ];
+    } else if (variant === "cascade") {
+      const tileWidth = innerWidth * 0.73;
+      const tileHeight = tileWidth * 9 / 16;
+      const step = tileHeight * 0.62;
+      const top = (safeHeight - tileHeight - step * Math.max(0, count - 1)) / 2;
+      slots = Array.from({ length: count }, (_, index) => makeSlot(
+        index % 2 ? safeWidth - metrics.outer - tileWidth : metrics.outer,
+        top + index * step,
+        tileWidth,
+      ));
+    } else {
+      const tileWidth = (innerWidth - metrics.gap) / 2;
+      const tileHeight = tileWidth * 9 / 16;
+      const rowYs = centeredRows(safeHeight, [fullHeight, tileHeight], metrics.gap);
+      slots = [
+        ...(count ? [makeSlot(metrics.outer, rowYs[0], innerWidth)] : []),
+        ...(count > 1 ? gridSlots(innerWidth, 2, count - 1, metrics.outer, rowYs[1], metrics.gap) : []),
+      ];
+    }
+  } else if (layout === "four") {
+    if (variant === "hero-strip") {
+      const tileWidth = (innerWidth - metrics.gap * 2) / 3;
+      const tileHeight = tileWidth * 9 / 16;
+      const rowYs = centeredRows(safeHeight, [fullHeight, tileHeight], metrics.gap);
+      slots = [
+        ...(count ? [makeSlot(metrics.outer, rowYs[0], innerWidth)] : []),
+        ...(count > 1 ? gridSlots(innerWidth, 3, count - 1, metrics.outer, rowYs[1], metrics.gap) : []),
+      ];
+    } else if (variant === "cascade") {
+      const tileWidth = innerWidth * 0.7;
+      const tileHeight = tileWidth * 9 / 16;
+      const step = tileHeight * 0.54;
+      const top = (safeHeight - tileHeight - step * Math.max(0, count - 1)) / 2;
+      slots = Array.from({ length: count }, (_, index) => makeSlot(
+        index % 2 ? safeWidth - metrics.outer - tileWidth : metrics.outer,
+        top + index * step,
+        tileWidth,
+      ));
+    } else {
+      const tileWidth = (innerWidth - metrics.gap) / 2;
+      const tileHeight = tileWidth * 9 / 16;
+      const rows = Math.ceil(count / 2);
+      const contentHeight = rows * tileHeight + Math.max(0, rows - 1) * metrics.gap;
+      slots = gridSlots(innerWidth, 2, count, metrics.outer, (safeHeight - contentHeight) / 2, metrics.gap);
+    }
+  } else {
+    const tileWidth = (innerWidth - metrics.gap) / 2;
+    const tileHeight = tileWidth * 9 / 16;
+    const gridItems = Math.max(0, count - 1);
+    const rows = Math.ceil(gridItems / 2);
+    const contentHeight = fullHeight
+      + (gridItems ? metrics.gap + rows * tileHeight + Math.max(0, rows - 1) * metrics.gap : 0);
+    const top = Math.max(metrics.outer, (safeHeight - contentHeight) / 2);
+    if (count) slots.push(makeSlot(metrics.outer, top, innerWidth));
+    if (gridItems) {
+      slots.push(...gridSlots(
+        innerWidth,
+        2,
+        gridItems,
+        metrics.outer,
+        top + fullHeight + metrics.gap,
+        metrics.gap,
+      ));
+    }
+  }
+
+  return { ...metrics, slots };
+}
+
 export function polygonArea(points) {
   if (!Array.isArray(points) || points.length < 3) return 0;
   let area = 0;

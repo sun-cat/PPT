@@ -1,5 +1,7 @@
 import {
   affineFromTriangles,
+  chunkSequential,
+  computeBatchCollageLayout,
   computeCollageLayout,
   computeImageFitRect,
   computeShowcaseCollageLayout,
@@ -7,11 +9,12 @@ import {
   computeUnitSquareHomography,
   estimateQuadAspect,
   expandTriangleForOverlap,
+  getBatchCollageGroupSize,
   parseFeaturedPageNumbers,
   projectUnitPoint,
   resolvePerspectiveRasterAspect,
   validatePerspectiveQuad,
-} from "/image-tool-math.js?v=20260818-perspective-full-migration1";
+} from "/image-tool-math.js?v=20260826-batch-collage-v1";
 import { createStoredZip } from "/zip-store.js?v=20260810-batch-export";
 import {
   MAX_SCENE_TEMPLATES,
@@ -108,6 +111,10 @@ const collageState = {
   rendered: false,
   activeTemplate: "classic",
   heroValues: { classic: "", showcase: "" },
+  mode: "cover",
+  selectedPageNumbers: new Set(),
+  batchGroupIndex: 0,
+  batchExporting: false,
 };
 
 const collage = {
@@ -117,6 +124,9 @@ const collage = {
   pageRange: $("#collagePageRange"),
   extractButton: $("#extractPptButton"),
   status: $("#collageExtractStatus"),
+  modeInputs: $$("input[name='collageMode']"),
+  coverSettings: $("#collageCoverSettings"),
+  batchSettings: $("#collageBatchSettings"),
   templateInputs: $$("input[name='collageTemplate']"),
   heroPages: $("#collageHeroPages"),
   heroLabel: $("#collageHeroLabel"),
@@ -124,11 +134,33 @@ const collage = {
   background: $("#collageBackgroundColor"),
   colorValue: $("#collageColorValue"),
   renderButton: $("#renderCollageButton"),
+  batchRenderButton: $("#renderBatchCollageButton"),
+  batchLayoutInputs: $$("input[name='batchLayout']"),
+  batchGridField: $("#batchGridField"),
+  batchGridCount: $("#batchGridCount"),
+  batchVariantField: $("#batchVariantField"),
+  batchVariant: $("#batchVariant"),
+  batchEdgeInputs: $$("input[name='batchEdgeStyle']"),
+  batchFormatInputs: $$("input[name='batchFormat']"),
+  batchSummary: $("#batchGroupSummary"),
   canvas: $("#collageCanvas"),
   empty: $("#collageCanvasEmpty"),
+  emptyTitle: $("#collageEmptyTitle"),
+  emptyHelp: $("#collageEmptyHelp"),
   thumbs: $("#collageThumbs"),
+  previewTitle: $("#collagePreviewTitle"),
+  previewEyebrow: $("#collagePreviewEyebrow"),
+  batchPreviewNav: $("#batchPreviewNav"),
+  batchPreviewMeta: $("#batchPreviewMeta"),
+  previousGroupButton: $("#previousBatchGroup"),
+  nextGroupButton: $("#nextBatchGroup"),
+  batchPageToolbar: $("#batchPageToolbar"),
+  batchSelectionMeta: $("#batchSelectionMeta"),
+  selectAllButton: $("#selectAllBatchPages"),
+  invertButton: $("#invertBatchPages"),
   pngButton: $("#downloadCollagePng"),
   jpgButton: $("#downloadCollageJpg"),
+  zipButton: $("#downloadCollageZip"),
 };
 
 function normalizePageRangeHeader(value) {
@@ -137,6 +169,110 @@ function normalizePageRangeHeader(value) {
     .replace(/[，、；;]/g, ",")
     .replace(/[—~至]/g, "-")
     .replace(/\s+/g, "");
+}
+
+function getCollageMode() {
+  return collage.modeInputs.find((input) => input.checked)?.value || "cover";
+}
+
+function getBatchLayout() {
+  return collage.batchLayoutInputs.find((input) => input.checked)?.value || "theme-grid";
+}
+
+function getBatchEdgeStyle() {
+  return collage.batchEdgeInputs.find((input) => input.checked)?.value || "classic";
+}
+
+function getBatchFormat() {
+  return collage.batchFormatInputs.find((input) => input.checked)?.value || "png";
+}
+
+function batchLayoutName(layout = getBatchLayout()) {
+  return {
+    "theme-grid": "主题宫格",
+    two: "2 拼",
+    three: "3 拼",
+    four: "4 拼",
+    five: "5 拼",
+  }[layout] || "主题宫格";
+}
+
+function getSelectedBatchPages() {
+  return collageState.pages.filter((page) => collageState.selectedPageNumbers.has(page.pageNumber));
+}
+
+function getBatchGroups() {
+  const size = getBatchCollageGroupSize(getBatchLayout(), Number(collage.batchGridCount.value));
+  return chunkSequential(getSelectedBatchPages(), size);
+}
+
+function batchVariantOptions(layout = getBatchLayout()) {
+  const options = {
+    "theme-grid": [["default", "主题页在上，课件宫格在下"]],
+    two: [["stacked", "上下通栏"], ["side-by-side", "左右并排"], ["offset", "错位叠放"]],
+    three: [["hero-top", "上方主图＋下方双图"], ["hero-bottom", "上方双图＋下方主图"], ["cascade", "错位叠放"]],
+    four: [["grid", "标准 2×2"], ["hero-strip", "上方主图＋下方三图"], ["cascade", "错位叠放"]],
+    five: [["default", "上方主图＋下方 2×2"]],
+  };
+  return options[layout] || options["theme-grid"];
+}
+
+function updateBatchVariantOptions() {
+  const layout = getBatchLayout();
+  const currentValue = collage.batchVariant.value;
+  collage.batchVariant.innerHTML = "";
+  for (const [value, label] of batchVariantOptions(layout)) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    collage.batchVariant.append(option);
+  }
+  if ([...collage.batchVariant.options].some((option) => option.value === currentValue)) {
+    collage.batchVariant.value = currentValue;
+  }
+  collage.batchGridField.hidden = layout !== "theme-grid";
+  collage.batchVariantField.hidden = ["theme-grid", "five"].includes(layout);
+}
+
+function updateBatchSummary() {
+  const selectedCount = getSelectedBatchPages().length;
+  const groups = getBatchGroups();
+  const groupSize = getBatchCollageGroupSize(getBatchLayout(), Number(collage.batchGridCount.value));
+  collage.batchSelectionMeta.textContent = `已选 ${selectedCount} 页 · 预计生成 ${groups.length} 张`;
+  collage.batchSummary.textContent = selectedCount
+    ? `已选 ${selectedCount} 页，每 ${groupSize} 页顺序分组，预计生成 ${groups.length} 张；最后不足一组也会保留。`
+    : "请至少勾选 1 页参与批量拼图。";
+  collage.batchRenderButton.disabled = selectedCount === 0 || collageState.batchExporting;
+  collage.zipButton.disabled = groups.length === 0 || collageState.batchExporting;
+  return groups;
+}
+
+function updateCollageModeUi({ render = true } = {}) {
+  const mode = getCollageMode();
+  collageState.mode = mode;
+  collage.coverSettings.hidden = mode !== "cover";
+  collage.batchSettings.hidden = mode !== "batch";
+  collage.batchPreviewNav.hidden = mode !== "batch";
+  collage.batchPageToolbar.hidden = mode !== "batch";
+  collage.zipButton.hidden = mode !== "batch";
+  collage.previewTitle.textContent = mode === "batch" ? "批量课件拼图" : "小红书商品封面";
+  collage.emptyTitle.textContent = mode === "batch" ? "提取页面后生成批量拼图" : "提取页面后生成封面";
+  collage.emptyHelp.textContent = mode === "batch"
+    ? "可全选或勾选页面，再选择主题宫格、2 拼、3 拼、4 拼或 5 拼。"
+    : "重点三图适合 6—14 页；主图＋课件矩阵建议至少 13 页。";
+  collage.pngButton.textContent = mode === "batch" ? "导出本组 PNG" : "导出 PNG";
+  collage.jpgButton.textContent = mode === "batch" ? "导出本组 JPG" : "导出 JPG";
+  updateBatchSummary();
+  if (!collageState.pages.length) {
+    collage.empty.hidden = false;
+    collage.pngButton.disabled = true;
+    collage.jpgButton.disabled = true;
+    renderCollageThumbs();
+    return;
+  }
+  if (!render) return;
+  const renderer = mode === "batch" ? renderBatchCollage() : renderCollage();
+  renderer.catch((error) => setStatus(collage.status, "error", error.message));
 }
 
 function getCollageTemplate() {
@@ -180,11 +316,15 @@ function updateCollageTemplateUi({ render = true } = {}) {
 function selectCollageFile(file) {
   collageState.pages = [];
   collageState.rendered = false;
+  collageState.selectedPageNumbers = new Set();
+  collageState.batchGroupIndex = 0;
   collage.thumbs.innerHTML = "";
   collage.empty.hidden = false;
   collage.renderButton.disabled = true;
   collage.pngButton.disabled = true;
   collage.jpgButton.disabled = true;
+  collage.zipButton.disabled = true;
+  updateBatchSummary();
   if (!file) {
     collageState.file = null;
     collage.fileName.textContent = "尚未选择文件 · 最大 180 MB";
@@ -275,17 +415,40 @@ function parseHeroPageNumbers(template = getCollageTemplate()) {
 
 function renderCollageThumbs(heroNumbers = [], template = getCollageTemplate()) {
   const heroSet = new Set(heroNumbers);
+  const currentBatchSet = new Set(
+    getBatchGroups()[collageState.batchGroupIndex]?.map((page) => page.pageNumber) || [],
+  );
   collage.thumbs.innerHTML = "";
   for (const page of collageState.pages) {
-    const card = document.createElement("article");
-    card.className = `extracted-page-card${heroSet.has(page.pageNumber) ? " hero" : ""}`;
+    const batchMode = collageState.mode === "batch";
+    const card = document.createElement(batchMode ? "label" : "article");
+    card.className = `extracted-page-card${heroSet.has(page.pageNumber) ? " hero" : ""}${currentBatchSet.has(page.pageNumber) ? " current-group" : ""}${batchMode ? " selectable" : ""}`;
+    if (batchMode) {
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = collageState.selectedPageNumbers.has(page.pageNumber);
+      checkbox.setAttribute("aria-label", `选择第 ${page.pageNumber} 页`);
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) collageState.selectedPageNumbers.add(page.pageNumber);
+        else collageState.selectedPageNumbers.delete(page.pageNumber);
+        collageState.batchGroupIndex = 0;
+        updateBatchSummary();
+        renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+      });
+      card.append(checkbox);
+    }
     const image = document.createElement("img");
     image.src = page.dataUrl;
     image.alt = `PPT 第 ${page.pageNumber} 页`;
     image.loading = "lazy";
     const label = document.createElement("span");
     const featuredText = template === "showcase" ? "顶部主视觉" : "重点大图";
-    label.innerHTML = `第 ${page.pageNumber} 页${heroSet.has(page.pageNumber) ? `<b>${featuredText}</b>` : ""}`;
+    label.append(document.createTextNode(`第 ${page.pageNumber} 页`));
+    if (!batchMode && heroSet.has(page.pageNumber)) {
+      const featured = document.createElement("b");
+      featured.textContent = featuredText;
+      label.append(featured);
+    }
     card.append(image, label);
     collage.thumbs.append(card);
   }
@@ -370,6 +533,7 @@ async function renderCollage() {
   collage.empty.hidden = true;
   collage.pngButton.disabled = false;
   collage.jpgButton.disabled = false;
+  collage.batchPreviewMeta.textContent = "商品封面单张预览";
   renderCollageThumbs(heroNumbers, template);
   setStatus(
     collage.status,
@@ -377,6 +541,79 @@ async function renderCollage() {
     template === "showcase"
       ? `拼图已生成：顶部 1 张主视觉，下方 ${smallPages.length} 张课件页。`
       : `拼图已生成：右侧 3 张重点大图，左侧 ${smallPages.length} 张缩略图。`,
+  );
+}
+
+function drawBatchPage(context, image, slot, layout) {
+  if (layout.shadow) {
+    context.save();
+    context.shadowColor = "rgba(18, 50, 42, 0.24)";
+    context.shadowBlur = 24;
+    context.shadowOffsetY = 12;
+    context.fillStyle = "#ffffff";
+    roundedRectPath(context, slot.x, slot.y, slot.width, slot.height, layout.radius);
+    context.fill();
+    context.restore();
+  }
+  drawRoundedImage(
+    context,
+    image,
+    slot.x,
+    slot.y,
+    slot.width,
+    slot.height,
+    layout.radius,
+  );
+}
+
+async function drawBatchGroupToCanvas(group, canvas) {
+  await Promise.all(group.map(async (page) => {
+    if (!page.image) page.image = await loadImage(page.dataUrl);
+  }));
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = collage.background.value;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const layout = computeBatchCollageLayout(canvas.width, canvas.height, {
+    layout: getBatchLayout(),
+    variant: collage.batchVariant.value || "default",
+    itemCount: group.length,
+    gridCount: Number(collage.batchGridCount.value),
+    edgeStyle: getBatchEdgeStyle(),
+  });
+  group.forEach((page, index) => drawBatchPage(context, page.image, layout.slots[index], layout));
+}
+
+async function renderBatchCollage(index = collageState.batchGroupIndex) {
+  const groups = updateBatchSummary();
+  if (!groups.length) {
+    collageState.rendered = false;
+    collage.empty.hidden = false;
+    collage.pngButton.disabled = true;
+    collage.jpgButton.disabled = true;
+    collage.zipButton.disabled = true;
+    collage.batchPreviewMeta.textContent = "第 0 / 0 组";
+    collage.previousGroupButton.disabled = true;
+    collage.nextGroupButton.disabled = true;
+    renderCollageThumbs();
+    throw new Error("请至少勾选 1 页参与批量拼图。");
+  }
+  collageState.batchGroupIndex = Math.max(0, Math.min(groups.length - 1, Number(index) || 0));
+  const group = groups[collageState.batchGroupIndex];
+  await drawBatchGroupToCanvas(group, collage.canvas);
+  collageState.rendered = true;
+  collage.empty.hidden = true;
+  collage.pngButton.disabled = false;
+  collage.jpgButton.disabled = false;
+  collage.zipButton.disabled = collageState.batchExporting;
+  collage.batchPreviewMeta.textContent = `第 ${collageState.batchGroupIndex + 1} / ${groups.length} 组 · 第 ${group.map((page) => page.pageNumber).join("、")} 页`;
+  collage.previousGroupButton.disabled = collageState.batchExporting || collageState.batchGroupIndex === 0;
+  collage.nextGroupButton.disabled = collageState.batchExporting || collageState.batchGroupIndex >= groups.length - 1;
+  renderCollageThumbs();
+  setStatus(
+    collage.status,
+    "success",
+    `已生成“${batchLayoutName()}”第 ${collageState.batchGroupIndex + 1}/${groups.length} 组，共 ${group.length} 页。`,
   );
 }
 
@@ -402,10 +639,13 @@ async function extractPptPages() {
     if (!response.ok) throw new Error(body.error || `提取失败（HTTP ${response.status}）。`);
     collageState.pages = body.pages || [];
     collageState.rendered = false;
+    collageState.selectedPageNumbers = new Set(collageState.pages.map((page) => page.pageNumber));
+    collageState.batchGroupIndex = 0;
     collageState.heroValues.classic = collageState.pages.slice(0, 3).map((page) => page.pageNumber).join(",");
     collageState.heroValues.showcase = collageState.pages[0]?.pageNumber ? String(collageState.pages[0].pageNumber) : "";
     collage.heroPages.value = collageState.heroValues[getCollageTemplate()];
     collage.renderButton.disabled = collageState.pages.length < collageTemplateMinimum();
+    updateBatchSummary();
     renderCollageThumbs();
     const missingText = body.missingPages?.length
       ? `；第 ${body.missingPages.join("、")} 页渲染失败，已跳过`
@@ -414,9 +654,14 @@ async function extractPptPages() {
       body.extractionMode === "rendered"
         ? "已用本机 PowerPoint 渲染"
         : "已快速读取";
-    if (collageState.pages.length >= collageTemplateMinimum()) await renderCollage();
-    const collageText =
-      collageState.pages.length >= collageTemplateMinimum()
+    if (collageState.mode === "batch" && collageState.pages.length) {
+      await renderBatchCollage();
+    } else if (collageState.pages.length >= collageTemplateMinimum()) {
+      await renderCollage();
+    }
+    const collageText = collageState.mode === "batch"
+      ? `；已按“${batchLayoutName()}”生成 ${getBatchGroups().length} 组预览`
+      : collageState.pages.length >= collageTemplateMinimum()
         ? `；已生成“${collageTemplateName()}”商品主图`
         : "";
     setStatus(
@@ -426,7 +671,9 @@ async function extractPptPages() {
     );
   } catch (error) {
     collageState.pages = [];
+    collageState.selectedPageNumbers = new Set();
     collage.renderButton.disabled = true;
+    updateBatchSummary();
     renderCollageThumbs();
     setStatus(collage.status, "error", error.message);
   } finally {
@@ -473,6 +720,63 @@ function downloadBlob(blob, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function currentBatchFilename(extension) {
+  const groups = getBatchGroups();
+  const group = groups[collageState.batchGroupIndex] || [];
+  const number = String(collageState.batchGroupIndex + 1).padStart(2, "0");
+  const pageText = group.length
+    ? `第${group[0].pageNumber}-${group[group.length - 1].pageNumber}页`
+    : "空组";
+  return `PPT批量拼图-${number}-${pageText}.${extension}`;
+}
+
+async function exportAllBatchCollages() {
+  if (collageState.batchExporting) return;
+  const groups = getBatchGroups();
+  if (!groups.length) {
+    setStatus(collage.status, "error", "请至少勾选 1 页参与批量拼图。");
+    return;
+  }
+  collageState.batchExporting = true;
+  updateBatchSummary();
+  collage.pngButton.disabled = true;
+  collage.jpgButton.disabled = true;
+  collage.previousGroupButton.disabled = true;
+  collage.nextGroupButton.disabled = true;
+  const format = getBatchFormat();
+  const mimeType = format === "jpg" ? "image/jpeg" : "image/png";
+  const formatLabel = format.toUpperCase();
+  let finalState = "success";
+  let finalMessage = "";
+  try {
+    const entries = [];
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = collage.canvas.width;
+    exportCanvas.height = collage.canvas.height;
+    for (let index = 0; index < groups.length; index += 1) {
+      const group = groups[index];
+      setStatus(collage.status, "working", `正在生成第 ${index + 1}/${groups.length} 组 ${formatLabel}…`);
+      await nextAnimationFrame();
+      await drawBatchGroupToCanvas(group, exportCanvas);
+      const blob = await canvasToBlob(exportCanvas, mimeType, 0.94);
+      const number = String(index + 1).padStart(2, "0");
+      const pageText = `第${group[0].pageNumber}-${group[group.length - 1].pageNumber}页`;
+      entries.push({ name: `PPT批量拼图-${number}-${pageText}.${format}`, data: blob });
+    }
+    setStatus(collage.status, "working", `正在打包 ${groups.length} 张拼图…`);
+    const archive = await createStoredZip(entries);
+    downloadBlob(archive, `PPT批量拼图-${batchLayoutName()}-${groups.length}张-${formatLabel}.zip`);
+    finalMessage = `已导出 ${groups.length} 张 ${formatLabel} 拼图，ZIP 已开始下载。`;
+  } catch (error) {
+    finalState = "error";
+    finalMessage = `批量导出失败：${error.message}`;
+  } finally {
+    collageState.batchExporting = false;
+    await renderBatchCollage().catch(() => {});
+    if (finalMessage) setStatus(collage.status, finalState, finalMessage);
+  }
+}
+
 collage.fileButton.addEventListener("click", () => collage.fileInput.click());
 collage.fileInput.addEventListener("change", (event) => selectCollageFile(event.target.files?.[0]));
 collage.extractButton.addEventListener("click", extractPptPages);
@@ -486,20 +790,86 @@ collage.renderButton.addEventListener("click", async () => {
 collage.templateInputs.forEach((input) => {
   input.addEventListener("change", () => updateCollageTemplateUi());
 });
+collage.modeInputs.forEach((input) => {
+  input.addEventListener("change", () => updateCollageModeUi());
+});
+collage.batchLayoutInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    collageState.batchGroupIndex = 0;
+    updateBatchVariantOptions();
+    updateBatchSummary();
+    if (collageState.mode === "batch" && getSelectedBatchPages().length) {
+      renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+    }
+  });
+});
+[collage.batchGridCount, collage.batchVariant].forEach((control) => {
+  control.addEventListener("change", () => {
+    collageState.batchGroupIndex = 0;
+    updateBatchSummary();
+    if (collageState.mode === "batch" && getSelectedBatchPages().length) {
+      renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+    }
+  });
+});
+collage.batchEdgeInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    if (collageState.mode === "batch" && getSelectedBatchPages().length) {
+      renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+    }
+  });
+});
 collage.background.addEventListener("input", () => {
   collage.colorValue.textContent = collage.background.value.toUpperCase();
-  if (collageState.rendered) renderCollage().catch(() => {});
+  if (collageState.rendered) {
+    const renderer = collageState.mode === "batch" ? renderBatchCollage() : renderCollage();
+    renderer.catch(() => {});
+  }
 });
 collage.heroPages.addEventListener("change", () => {
   collageState.heroValues[getCollageTemplate()] = collage.heroPages.value;
   if (collageState.pages.length >= collageTemplateMinimum()) renderCollage().catch((error) => setStatus(collage.status, "error", error.message));
 });
-collage.pngButton.addEventListener("click", () =>
-  downloadCanvas(collage.canvas, "image/png", `商品主图-${collageTemplateName()}.png`),
-);
-collage.jpgButton.addEventListener("click", () =>
-  downloadCanvas(collage.canvas, "image/jpeg", `商品主图-${collageTemplateName()}.jpg`, 0.94),
-);
+collage.batchRenderButton.addEventListener("click", () => {
+  renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+});
+collage.previousGroupButton.addEventListener("click", () => {
+  renderBatchCollage(collageState.batchGroupIndex - 1).catch((error) => setStatus(collage.status, "error", error.message));
+});
+collage.nextGroupButton.addEventListener("click", () => {
+  renderBatchCollage(collageState.batchGroupIndex + 1).catch((error) => setStatus(collage.status, "error", error.message));
+});
+collage.selectAllButton.addEventListener("click", () => {
+  collageState.selectedPageNumbers = new Set(collageState.pages.map((page) => page.pageNumber));
+  collageState.batchGroupIndex = 0;
+  renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+});
+collage.invertButton.addEventListener("click", () => {
+  collageState.selectedPageNumbers = new Set(
+    collageState.pages
+      .filter((page) => !collageState.selectedPageNumbers.has(page.pageNumber))
+      .map((page) => page.pageNumber),
+  );
+  collageState.batchGroupIndex = 0;
+  updateBatchSummary();
+  renderBatchCollage().catch((error) => setStatus(collage.status, "error", error.message));
+});
+collage.pngButton.addEventListener("click", () => {
+  const filename = collageState.mode === "batch"
+    ? currentBatchFilename("png")
+    : `商品主图-${collageTemplateName()}.png`;
+  downloadCanvas(collage.canvas, "image/png", filename);
+});
+collage.jpgButton.addEventListener("click", () => {
+  const filename = collageState.mode === "batch"
+    ? currentBatchFilename("jpg")
+    : `商品主图-${collageTemplateName()}.jpg`;
+  downloadCanvas(collage.canvas, "image/jpeg", filename, 0.94);
+});
+collage.zipButton.addEventListener("click", exportAllBatchCollages);
+
+updateBatchVariantOptions();
+updateCollageModeUi({ render: false });
 
 const perspectiveState = {
   backgroundFile: null,

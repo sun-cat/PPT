@@ -5,6 +5,7 @@ import {
   apiOrigin,
   apiSettingsForLocalStorage,
   imageProviderMode,
+  isApiMartEndpoint,
   isVolcengineSeedreamEndpoint,
   isWukongStudioEndpoint,
   normalizeWukongApiKey,
@@ -37,6 +38,13 @@ test("recognizes the official Volcengine Ark image provider", () => {
     "volcengine-seedream",
   );
   assert.equal(imageProviderMode("https://api.example.com/v1"), "custom");
+});
+
+test("recognizes APIMart API hosts without treating the dashboard as an API", () => {
+  assert.equal(isApiMartEndpoint("https://api.aiuxu.com/v1"), true);
+  assert.equal(isApiMartEndpoint("https://api.apimart.ai/v1/images/generations"), true);
+  assert.equal(isApiMartEndpoint("https://aiuxu.com/zh/overview"), false);
+  assert.equal(imageProviderMode("https://api.apib.ai/v1"), "apimart");
 });
 
 test("normalizes an accidentally duplicated Wukong key prefix", () => {

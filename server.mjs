@@ -31,6 +31,7 @@ loadEnvFile(path.join(rootDir, ".env"));
 
 const port = Number.parseInt(process.env.PORT || "3210", 10);
 const host = "127.0.0.1";
+const MAX_EXPORT_REQUEST_BYTES = 200 * 1024 * 1024;
 const detectedSystemProxyUrl = detectSystemProxyUrl();
 const mockImage =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l4Gf9QAAAABJRU5ErkJggg==";
@@ -47,6 +48,7 @@ const staticFiles = new Map([
   ["/scene-template-store.js", ["scene-template-store.js", "text/javascript; charset=utf-8"]],
   ["/script-parser.js", ["script-parser.js", "text/javascript; charset=utf-8"]],
   ["/style-parser.js", ["style-parser.js", "text/javascript; charset=utf-8"]],
+  ["/slide-history.js", ["slide-history.js", "text/javascript; charset=utf-8"]],
   ["/tools.js", ["tools.js", "text/javascript; charset=utf-8"]],
   ["/zip-store.js", ["zip-store.js", "text/javascript; charset=utf-8"]],
   ["/image-tool-math.js", ["image-tool-math.js", "text/javascript; charset=utf-8"]],
@@ -464,7 +466,7 @@ async function handleRequest(request, response) {
   }
 
   if (request.method === "POST" && url.pathname === "/api/export-pptx") {
-    const input = await readJson(request, 120 * 1024 * 1024);
+    const input = await readJson(request, MAX_EXPORT_REQUEST_BYTES);
     const slides = Array.isArray(input.slides)
       ? input.slides.filter((slide) => slide?.imageDataUrl)
       : [];

@@ -34,8 +34,25 @@ export function isVolcengineSeedreamEndpoint(value) {
   }
 }
 
+export function isApiMartEndpoint(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    const hostname = new URL(raw).hostname.toLowerCase();
+    return [
+      "api.apimart.ai",
+      "api.aiuxu.com",
+      "api.apib.ai",
+      "api.aishuch.com",
+    ].includes(hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function imageProviderMode(value) {
   if (isWukongStudioEndpoint(value)) return "wukong";
+  if (isApiMartEndpoint(value)) return "apimart";
   if (isVolcengineSeedreamEndpoint(value)) return "volcengine-seedream";
   return "custom";
 }

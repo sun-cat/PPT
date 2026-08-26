@@ -101,3 +101,75 @@ export function parsePageStyleScript(source) {
 
   return { pages, warnings };
 }
+
+function normalizePageStyleFields(fields = {}) {
+  return {
+    style: String(fields.style || "").trim(),
+    elements: String(fields.elements || "").trim(),
+    extra: String(fields.extra || "").trim(),
+  };
+}
+
+export function getPageStyleFields(source, pageNumber) {
+  const target = Number(pageNumber);
+  const pages = parsePageStyleScript(source).pages.filter(
+    (page) => page.pageNumber === target,
+  );
+  return normalizePageStyleFields({
+    style: pages.map((page) => page.style).filter(Boolean).join("\n\n"),
+    elements: pages.map((page) => page.elements).filter(Boolean).join("\n\n"),
+    extra: pages.map((page) => page.extra).filter(Boolean).join("\n\n"),
+  });
+}
+
+export function updatePageStyleScript(source, pageNumber, fields = {}) {
+  const target = Number(pageNumber);
+  if (!Number.isSafeInteger(target) || target < 1) {
+    throw new Error("需要提供有效的页面编号。");
+  }
+
+  const normalizedSource = String(source || "").replace(/\r\n?/g, "\n").trim();
+  if (normalizedSource) parsePageStyleScript(normalizedSource);
+
+  const { style, elements, extra } = normalizePageStyleFields(fields);
+  const replacement = [
+    `第${target}页`,
+    style ? `画面风格：\n${style}` : "",
+    elements ? `添加元素：\n${elements}` : "",
+    extra ? `补充要求：\n${extra}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const hasReplacement = Boolean(style || elements || extra);
+  if (!normalizedSource) return hasReplacement ? replacement : "";
+
+  const lines = normalizedSource.split("\n");
+  const sections = [];
+  let current = [];
+  let currentPage = null;
+  for (const line of lines) {
+    const match = line.match(PAGE_PATTERN);
+    if (match) {
+      if (current.length) sections.push({ pageNumber: currentPage, lines: current });
+      current = [line];
+      currentPage = Number.parseInt(match[1], 10);
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length) sections.push({ pageNumber: currentPage, lines: current });
+
+  let replaced = false;
+  const output = [];
+  for (const section of sections) {
+    if (section.pageNumber === target) {
+      if (!replaced && hasReplacement) output.push(replacement);
+      replaced = true;
+      continue;
+    }
+    const preserved = section.lines.join("\n").trim();
+    if (preserved) output.push(preserved);
+  }
+  if (!replaced && hasReplacement) output.push(replacement);
+  return output.join("\n\n");
+}

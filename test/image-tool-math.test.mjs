@@ -1,18 +1,60 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  chunkSequential,
+  computeBatchCollageLayout,
   computeCollageLayout,
   computeImageFitRect,
   computePerspectiveRasterSize,
   computeShowcaseCollageLayout,
   computeUnitSquareHomography,
   expandTriangleForOverlap,
+  getBatchCollageGroupSize,
   hasDuplicatePageNumbers,
   parseFeaturedPageNumbers,
   projectUnitPoint,
   resolvePerspectiveRasterAspect,
   validatePerspectiveQuad,
 } from "../public/image-tool-math.js";
+
+test("groups selected pages sequentially and keeps the final partial group", () => {
+  assert.deepEqual(chunkSequential([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+  assert.deepEqual(chunkSequential([], 4), []);
+});
+
+test("derives batch group sizes from the selected collage family", () => {
+  assert.equal(getBatchCollageGroupSize("theme-grid", 4), 5);
+  assert.equal(getBatchCollageGroupSize("theme-grid", 12), 13);
+  assert.equal(getBatchCollageGroupSize("two"), 2);
+  assert.equal(getBatchCollageGroupSize("five"), 5);
+});
+
+test("keeps every batch collage slot at 16 by 9 and inside the portrait canvas", () => {
+  const scenarios = [
+    ["theme-grid", "default", 13, 12],
+    ["two", "stacked", 2, 4],
+    ["two", "offset", 2, 4],
+    ["three", "hero-bottom", 3, 4],
+    ["four", "hero-strip", 4, 4],
+    ["five", "default", 5, 4],
+  ];
+  for (const [layout, variant, itemCount, gridCount] of scenarios) {
+    const result = computeBatchCollageLayout(1080, 1440, {
+      layout,
+      variant,
+      itemCount,
+      gridCount,
+      edgeStyle: "classic",
+    });
+    assert.equal(result.slots.length, itemCount, `${layout} ${variant}`);
+    for (const slot of result.slots) {
+      assert.ok(Math.abs(slot.width / slot.height - 16 / 9) < 1e-10, `${layout} ratio`);
+      assert.ok(slot.x >= 0 && slot.y >= 0, `${layout} origin`);
+      assert.ok(slot.x + slot.width <= 1080 + 1e-8, `${layout} width`);
+      assert.ok(slot.y + slot.height <= 1440 + 1e-8, `${layout} height`);
+    }
+  }
+});
 
 test("uses a compact near-seamless collage grid", () => {
   const layout = computeCollageLayout(1080, 1440, 11);
