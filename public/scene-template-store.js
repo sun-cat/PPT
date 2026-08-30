@@ -3,7 +3,7 @@ const DATABASE_VERSION = 1;
 const TEMPLATE_STORE = "templates";
 const SUMMARY_STORE = "summaries";
 
-export const MAX_SCENE_TEMPLATES = 12;
+export const MAX_SCENE_TEMPLATES = 200;
 
 function getIndexedDb() {
   const database = globalThis.indexedDB;

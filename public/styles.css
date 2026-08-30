@@ -4092,7 +4092,12 @@ button {
 .scene-template-list {
   display: grid;
   gap: 8px;
+  max-height: 420px;
   margin-top: 11px;
+  padding-right: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .scene-template-empty {

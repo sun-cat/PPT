@@ -8,6 +8,7 @@ import {
 } from "../public/scene-template-store.js";
 
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 const tools = await readFile(new URL("../public/tools.js", import.meta.url), "utf8");
 const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
 
@@ -15,7 +16,7 @@ test("常用场景使用独立 IndexedDB 存放原图和轻量摘要", () => {
   assert.equal(sceneTemplateStoreMetadata.databaseName, "mini-hanghai-scene-templates-v1");
   assert.equal(sceneTemplateStoreMetadata.templateStore, "templates");
   assert.equal(sceneTemplateStoreMetadata.summaryStore, "summaries");
-  assert.equal(MAX_SCENE_TEMPLATES, 12);
+  assert.equal(MAX_SCENE_TEMPLATES, 200);
 });
 
 test("场景换图页提供保存 使用 重命名和删除入口", () => {
@@ -28,6 +29,12 @@ test("场景换图页提供保存 使用 重命名和删除入口", () => {
   assert.match(tools, /startSceneTemplateRename/);
   assert.match(tools, /commitSceneTemplateRename/);
   assert.match(tools, /removeStoredSceneTemplate/);
+});
+
+test("常用场景列表达到可视高度后提供纵向滚动", () => {
+  assert.match(html, /id="sceneTemplateCount"[^>]*>0 \/ 200</);
+  assert.match(html, /最多 200 个/);
+  assert.match(styles, /\.scene-template-list\s*\{[^}]*max-height:\s*420px;[^}]*overflow-y:\s*auto;/s);
 });
 
 test("模板保存背景图 四点定位和画面贴合设置", () => {
