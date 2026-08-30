@@ -174,6 +174,7 @@ export function computeBatchCollageLayout(
     itemCount,
     gridCount = 4,
     edgeStyle = "classic",
+    twoStackedGap,
   } = {},
 ) {
   const safeWidth = Math.max(1, Number(width) || 1080);
@@ -225,7 +226,10 @@ export function computeBatchCollageLayout(
         tileWidth,
       ));
     } else {
-      const rowYs = centeredRows(safeHeight, Array(count).fill(fullHeight), metrics.gap);
+      const stackedGap = Number.isFinite(Number(twoStackedGap))
+        ? Math.max(0, Number(twoStackedGap))
+        : metrics.gap;
+      const rowYs = centeredRows(safeHeight, Array(count).fill(fullHeight), stackedGap);
       slots = rowYs.map((y) => makeSlot(metrics.outer, y, innerWidth));
     }
   } else if (layout === "three") {

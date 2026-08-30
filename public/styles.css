@@ -3845,6 +3845,8 @@ button {
 }
 
 .collage-canvas-stage {
+  /* 2 拼 → 上下通栏：上下两张图片的间距（按 1080px 导出画布计算） */
+  --batch-two-stacked-gap: 100px;
   width: min(100%, 540px);
   margin: 0 auto;
   position: relative;

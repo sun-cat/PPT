@@ -187,6 +187,13 @@ function getBatchFormat() {
   return collage.batchFormatInputs.find((input) => input.checked)?.value || "png";
 }
 
+function getBatchTwoStackedGap() {
+  const stage = collage.canvas.closest(".collage-canvas-stage");
+  const value = getComputedStyle(stage).getPropertyValue("--batch-two-stacked-gap");
+  const gap = Number.parseFloat(value);
+  return Number.isFinite(gap) ? Math.max(0, gap) : undefined;
+}
+
 function batchLayoutName(layout = getBatchLayout()) {
   return {
     "theme-grid": "主题宫格",
@@ -580,6 +587,7 @@ async function drawBatchGroupToCanvas(group, canvas) {
     itemCount: group.length,
     gridCount: Number(collage.batchGridCount.value),
     edgeStyle: getBatchEdgeStyle(),
+    twoStackedGap: getBatchTwoStackedGap(),
   });
   group.forEach((page, index) => drawBatchPage(context, page.image, layout.slots[index], layout));
 }

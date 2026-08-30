@@ -56,6 +56,26 @@ test("keeps every batch collage slot at 16 by 9 and inside the portrait canvas",
   }
 });
 
+test("applies the custom gap only to the two-page stacked layout", () => {
+  const stacked = computeBatchCollageLayout(1080, 1440, {
+    layout: "two",
+    variant: "stacked",
+    itemCount: 2,
+    edgeStyle: "classic",
+    twoStackedGap: 60,
+  });
+  assert.equal(stacked.slots[1].y - stacked.slots[0].y - stacked.slots[0].height, 60);
+
+  const sideBySide = computeBatchCollageLayout(1080, 1440, {
+    layout: "two",
+    variant: "side-by-side",
+    itemCount: 2,
+    edgeStyle: "classic",
+    twoStackedGap: 60,
+  });
+  assert.equal(sideBySide.slots[1].x - sideBySide.slots[0].x - sideBySide.slots[0].width, sideBySide.gap);
+});
+
 test("uses a compact near-seamless collage grid", () => {
   const layout = computeCollageLayout(1080, 1440, 11);
   assert.ok(layout.outer <= 4);
