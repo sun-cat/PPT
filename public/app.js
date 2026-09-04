@@ -20,7 +20,7 @@ import {
   normalizeStoredConnectionStatus,
   sanitizeProviderOverrides,
   wukongEndpointForDisplay,
-} from "/api-settings.js?v=20260826-apimart-profiles-v1";
+} from "/api-settings.js?v=20260904-codex-local-v1";
 import {
   normalizeGenerationConcurrency,
   runConcurrentTasks,
@@ -181,8 +181,12 @@ function populateWukongProducts(products = availableWukongProducts) {
 function configureConcurrencyOptions() {
   const select = $("#generationConcurrency");
   if (!select) return;
-  const wukong = isWukongStudioEndpoint(apiFields.endpoint.value);
-  const options = wukong
+  const providerMode = imageProviderMode(apiFields.endpoint.value, apiFields.provider.value);
+  const codexLocal = providerMode === "codex-local";
+  const wukong = providerMode === "wukong";
+  const options = codexLocal
+    ? [{ value: 1, label: "1 张（本机 Codex 串行）" }]
+    : wukong
     ? [
         { value: 1, label: "1 张（最稳）" },
         { value: 2, label: "2 张（推荐）" },
@@ -207,7 +211,9 @@ function configureConcurrencyOptions() {
   const allowed = options.map((option) => option.value);
   const next = allowed.includes(previous)
     ? previous
-    : wukong
+    : codexLocal
+      ? 1
+      : wukong
       ? Math.min(2, wukongMaxParallel)
       : 4;
   select.value = String(next);
@@ -229,13 +235,15 @@ function updateWukongCostEstimate() {
 }
 
 function refreshApiProviderGuidance() {
-  const providerMode = imageProviderMode(apiFields.endpoint.value);
+  const providerMode = imageProviderMode(apiFields.endpoint.value, apiFields.provider.value);
+  const codexLocal = providerMode === "codex-local";
   const wukong = providerMode === "wukong";
   const apimart = providerMode === "apimart";
   const volcengine = providerMode === "volcengine-seedream";
   const apimartOfficial = apimart && /-official$/i.test(apiFields.model.value.trim());
   apiFields.provider.value = providerMode;
   for (const [id, selected] of [
+    ["codexLocal", codexLocal],
     ["wukong", wukong],
     ["apiMart", apimart],
   ]) {
@@ -248,6 +256,12 @@ function refreshApiProviderGuidance() {
       presetButton.setAttribute("aria-pressed", String(selected));
     }
   }
+  $("#imageProviderHelp").textContent = codexLocal
+    ? "直接复用本机 Codex CLI 的 ChatGPT 登录状态，不需要 API Key。"
+    : "选择服务商后，工具会自动填写正确的图片接口路径。";
+  $("#endpointField").hidden = codexLocal;
+  $("#apiKeyField").hidden = codexLocal;
+  $("#advancedImageSettings").hidden = codexLocal;
   $("#seedreamModelField").hidden = !volcengine;
   if (volcengine) refreshSeedreamModelSelection();
   $("#endpointHelp").textContent = wukong
@@ -257,14 +271,18 @@ function refreshApiProviderGuidance() {
       : volcengine
         ? "火山方舟填写官方 Base URL；工具会自动使用 /api/v3/images/generations。"
         : "填写服务商提供的图片 API Base URL，工具会自动补全标准生图路径。";
-  $("#autoConfigTitle").textContent = wukong
+  $("#autoConfigTitle").textContent = codexLocal
+    ? "已选择本机 Codex"
+    : wukong
     ? "已识别悟空创作台"
     : apimart
       ? "已识别 APIMart"
       : volcengine
         ? "已识别火山方舟豆包生图"
         : "普通使用只需填写以上两项";
-  $("#autoConfigMessage").textContent = wukong
+  $("#autoConfigMessage").textContent = codexLocal
+    ? "检测只检查 CLI、登录状态和图片生成功能，不会生成图片；实际生图计入 Codex 使用额度。"
+    : wukong
     ? "请选择具体生图模型；系统会先直连悟空接口，失败时自动切换系统代理，并保留已提交任务供继续取回。"
     : apimart
       ? apimartOfficial
@@ -299,6 +317,10 @@ function refreshApiProviderGuidance() {
   }
   $("#modelField").hidden = wukong || volcengine;
   $("#wukongProductField").hidden = !wukong;
+  $("#localSaveTitle").textContent = codexLocal ? "复用本机登录" : "本机长期保存";
+  $("#localSaveMessage").textContent = codexLocal
+    ? "工具不会读取或保存登录 Token；生成任务由本机 Codex CLI 使用当前 ChatGPT 登录完成。"
+    : "API 地址与 Key 仅保存在当前浏览器；清除浏览器数据或点击“清除本机配置”后移除。";
   if (wukong) populateWukongProducts();
   configureConcurrencyOptions();
   updateWukongCostEstimate();
@@ -1337,6 +1359,7 @@ function collectRawApiSettings() {
       : preset;
   }
   return {
+    provider: apiFields.provider.value,
     endpoint: apiFields.endpoint.value.trim(),
     editEndpoint: apiFields.editEndpoint.value.trim(),
     apiKey: apiFields.apiKey.value,
@@ -1373,9 +1396,13 @@ function collectApiSettings() {
   return applyProviderSafety().settings;
 }
 
-function providerProfileId(endpoint = apiFields.endpoint.value) {
+function providerProfileId(
+  provider = apiFields.provider.value,
+  endpoint = apiFields.endpoint.value,
+) {
   if (isWukongStudioEndpoint(endpoint)) return "wukong";
   if (isApiMartEndpoint(endpoint)) return "apimart";
+  if (provider === "codex-local") return "codex-local";
   return "";
 }
 
@@ -1409,16 +1436,28 @@ function providerDefaults(providerId) {
     extraHeaders: "",
     connectionStatus: "pending",
   };
+  if (providerId === "codex-local") {
+    return {
+      ...common,
+      provider: "codex-local",
+      endpoint: "",
+      model: "",
+      size: "16:9",
+      extraBody: "",
+    };
+  }
   return providerId === "wukong"
     ? {
         ...common,
+        provider: "wukong",
         endpoint: WUKONG_ENDPOINT,
         model: WUKONG_RECOMMENDED_PRODUCT,
         size: "16:9",
         extraBody: "",
       }
-    : {
+      : {
         ...common,
+        provider: "apimart",
         endpoint: APIMART_ENDPOINT,
         model: APIMART_MODEL,
         size: "16:9",
@@ -1435,7 +1474,7 @@ function persistApiSettings() {
     settingsStorageKey,
     JSON.stringify(storedSettings),
   );
-  const profileId = providerProfileId(settings.endpoint);
+  const profileId = providerProfileId(settings.provider, settings.endpoint);
   if (profileId) {
     const profiles = readProviderProfiles();
     profiles[profileId] = storedSettings;
@@ -1463,12 +1502,12 @@ function applyApiSettings(settings = {}) {
         key === "endpoint" ? wukongEndpointForDisplay(settings[key]) : settings[key];
     }
   }
-  apiFields.provider.value = imageProviderMode(apiFields.endpoint.value);
+  apiFields.provider.value = imageProviderMode(apiFields.endpoint.value, settings.provider);
   refreshApiProviderGuidance();
 }
 
 function switchApiProvider(providerId) {
-  if (!new Set(["wukong", "apimart"]).has(providerId)) return;
+  if (!new Set(["codex-local", "wukong", "apimart"]).has(providerId)) return;
   const currentProviderId = providerProfileId();
   if (currentProviderId) persistApiSettings();
 
@@ -1479,11 +1518,15 @@ function switchApiProvider(providerId) {
   const status = normalizeStoredConnectionStatus(settings.connectionStatus);
   connectionVerified = status === "verified";
   connectionReachable = ["verified", "reachable"].includes(status);
-  connectionConfigured = Boolean(settings.endpoint);
+  connectionConfigured = providerId === "codex-local" || Boolean(settings.endpoint);
   persistApiSettings();
   resetApiKeyVisibility();
 
-  const providerName = providerId === "wukong" ? "悟空 API" : "APIMart";
+  const providerName = providerId === "codex-local"
+    ? "本机 Codex"
+    : providerId === "wukong"
+      ? "悟空 API"
+      : "APIMart";
   const restored = Boolean(profiles[providerId]);
   setConnectionState(
     connectionVerified ? "verified" : connectionReachable ? "reachable" : "warning",
@@ -1497,14 +1540,18 @@ function switchApiProvider(providerId) {
     "neutral",
     restored
       ? `已切换到 ${providerName}，并恢复这台电脑保存的独立配置`
-      : `已切换到 ${providerName}；粘贴该平台的 API Key 后点击“检测连接”`,
+      : providerId === "codex-local"
+        ? "已切换到本机 Codex；点击“检测连接”确认 CLI 登录状态"
+        : `已切换到 ${providerName}；粘贴该平台的 API Key 后点击“检测连接”`,
   );
-  if (apiFields.apiKey.value) $("#testConnectionButton").focus({ preventScroll: true });
+  if (providerId === "codex-local") {
+    $("#testConnectionButton").focus({ preventScroll: true });
+  } else if (apiFields.apiKey.value) $("#testConnectionButton").focus({ preventScroll: true });
   else apiFields.apiKey.focus({ preventScroll: true });
 }
 
 function selectImageProvider(providerId) {
-  if (["wukong", "apimart"].includes(providerId)) {
+  if (["codex-local", "wukong", "apimart"].includes(providerId)) {
     switchApiProvider(providerId);
     return;
   }
@@ -1520,6 +1567,7 @@ function clearApiSettings() {
   localStorage.removeItem(settingsStorageKey);
   localStorage.removeItem(providerProfilesStorageKey);
   const defaults = {
+    provider: "custom",
     endpoint: "",
     editEndpoint: "",
     apiKey: "",
@@ -1532,7 +1580,8 @@ function clearApiSettings() {
     extraHeaders: "",
   };
   for (const [key, value] of Object.entries(defaults)) {
-    if (apiFields[key]) apiFields[key].value = value;
+    if (key === "provider") apiFields.provider.value = value;
+    else if (apiFields[key]) apiFields[key].value = value;
   }
   refreshApiProviderGuidance();
   lastApiEndpoint = "";
@@ -1547,7 +1596,10 @@ function clearApiSettings() {
 }
 
 function openApiDialog() {
-  apiFields.provider.value = imageProviderMode(apiFields.endpoint.value);
+  apiFields.provider.value = imageProviderMode(
+    apiFields.endpoint.value,
+    apiFields.provider.value,
+  );
   refreshApiProviderGuidance();
   $("#apiDialog").showModal();
   setTestResult(
@@ -1561,7 +1613,11 @@ function openApiDialog() {
           : "填写完成后，请先检测连接",
   );
   requestAnimationFrame(() => {
-    const firstField = apiFields.endpoint.value ? apiFields.apiKey : apiFields.endpoint;
+    const firstField = apiFields.provider.value === "codex-local"
+      ? $("#testConnectionButton")
+      : apiFields.endpoint.value
+        ? apiFields.apiKey
+        : apiFields.endpoint;
     firstField.focus({ preventScroll: true });
   });
 }
@@ -1591,17 +1647,17 @@ function toggleApiKeyVisibility() {
 
 function saveApiSettings() {
   const settings = collectApiSettings();
-  const hasEndpoint = Boolean(settings.endpoint);
-  connectionConfigured = hasEndpoint;
+  const configured = settings.provider === "codex-local" || Boolean(settings.endpoint);
+  connectionConfigured = configured;
   persistApiSettings();
-  const state = hasEndpoint
+  const state = configured
     ? connectionVerified
       ? "verified"
       : connectionReachable
         ? "reachable"
         : "configured"
     : "";
-  const label = hasEndpoint
+  const label = configured
     ? connectionVerified
       ? "API 已连接"
       : connectionReachable
@@ -1611,7 +1667,7 @@ function saveApiSettings() {
   setConnectionState(state, label);
   closeApiDialog();
   toast(
-    hasEndpoint
+    configured
       ? connectionVerified
         ? "接口已验证并保存"
         : connectionReachable
@@ -1645,7 +1701,7 @@ async function testConnection() {
     if (wukongKeyPrefixAdjusted) apiFields.apiKey.value = normalizedKey;
   }
   const settings = collectApiSettings();
-  if (!settings.endpoint && !mockMode) {
+  if (settings.provider !== "codex-local" && !settings.endpoint && !mockMode) {
     connectionVerified = false;
     setTestResult("error", "请先填写图片生成 API 地址。");
     setConnectionState("error", "API 未配置");
@@ -1659,7 +1715,12 @@ async function testConnection() {
   button.textContent = "检测中…";
   button.classList.add("is-loading");
   button.setAttribute("aria-busy", "true");
-  setTestResult("working", "正在检测服务器、鉴权和模型接口…");
+  setTestResult(
+    "working",
+    settings.provider === "codex-local"
+      ? "正在检查本机 Codex CLI、登录状态和图片生成功能…"
+      : "正在检测服务器、鉴权和模型接口…",
+  );
   try {
     if (mockMode) {
       connectionVerified = true;
@@ -1722,9 +1783,11 @@ async function testConnection() {
     connectionReachable = Boolean(body.ok);
     connectionConfigured = true;
     useSystemProxyForWukong = body.networkRoute === "system-proxy";
-    apiFields.provider.value = body.providerMode === "volcengine-seedream"
+    apiFields.provider.value = body.providerMode === "codex-local"
+      ? "codex-local"
+      : body.providerMode === "volcengine-seedream"
       ? "volcengine-seedream"
-      : imageProviderMode(apiFields.endpoint.value);
+      : imageProviderMode(apiFields.endpoint.value, settings.provider);
     refreshApiProviderGuidance();
     persistApiSettings();
     const message = adjustments.length
@@ -1777,7 +1840,7 @@ function friendlyGenerationError(error) {
 
 function shouldHaltBatchGeneration(error) {
   const message = String(error?.message || error || "");
-  return /上游生图超时|图片生成超时|上游图片服务中途断开连接|无可用渠道|HTTP 503|图片服务暂时繁忙|通道.*(?:繁忙|不可用)/i.test(message);
+  return /上游生图超时|图片生成超时|上游图片服务中途断开连接|无可用渠道|HTTP 503|图片服务暂时繁忙|通道.*(?:繁忙|不可用)|本机 Codex|Codex CLI|Codex 当前使用额度|Codex 图片生成失败|Codex 已结束运行/i.test(message);
 }
 
 function defaultVisualPrompt(slide) {
@@ -1802,7 +1865,7 @@ async function generateOne(id, { silent = false, onBatchHalt = null } = {}) {
     return false;
   }
   const settings = collectApiSettings();
-  if (!settings.endpoint && !mockMode) {
+  if (settings.provider !== "codex-local" && !settings.endpoint && !mockMode) {
     slide.status = "error";
     slide.error = "请先在右上角“接口设置”中配置自己的 API。";
     setConnectionState("error", "API 未配置");
@@ -1913,7 +1976,7 @@ async function generateAll() {
     return;
   }
   const settings = collectApiSettings();
-  if (!settings.endpoint && !mockMode) {
+  if (settings.provider !== "codex-local" && !settings.endpoint && !mockMode) {
     toast("请先配置并检测自己的 API");
     openApiDialog();
     return;
@@ -1948,8 +2011,12 @@ async function generateAll() {
   const recoverable = slides.filter((slide) => slide.status === "recoverable").length;
   const unsubmitted = slides.filter((slide) => slide.status === "idle").length;
   if (batchHaltReason) {
-    setConnectionState("error", "上游超时，批量生成已暂停");
-    toast(`已暂停后续提交，剩余 ${unsubmitted} 页未提交；请先核对扣费并切换模型`);
+    setConnectionState("error", "生成异常，批量生成已暂停");
+    toast(
+      settings.provider === "codex-local"
+        ? `已暂停后续生图，剩余 ${unsubmitted} 页未提交；请先处理 Codex 提示`
+        : `已暂停后续提交，剩余 ${unsubmitted} 页未提交；请先核对扣费并切换模型`,
+    );
   } else {
     toast(
       recoverable
@@ -2581,7 +2648,8 @@ async function boot() {
       );
       connectionVerified = savedConnectionStatus === "verified";
       connectionReachable = ["verified", "reachable"].includes(savedConnectionStatus);
-      connectionConfigured = Boolean(savedSettings.endpoint);
+      connectionConfigured =
+        savedSettings.provider === "codex-local" || Boolean(savedSettings.endpoint);
       const sanitized = applyProviderSafety({
         previousEndpoint: "",
         ownerOrigin: savedSettings.providerOrigin || "",
@@ -2597,12 +2665,24 @@ async function boot() {
     mockMode = Boolean(config.mockMode);
     systemProxyDetected = Boolean(config.proxyDetected);
     systemProxyLabel = String(config.proxyLabel || "");
-    if (!apiFields.endpoint.value) apiFields.endpoint.value = config.endpoint || "";
-    if (!apiFields.editEndpoint.value) apiFields.editEndpoint.value = config.editEndpoint || "";
-    if (!apiFields.model.value) apiFields.model.value = config.model || "";
-    if (!apiFields.size.value) apiFields.size.value = config.size || "2048x1152";
-    if (!apiFields.quality.value) apiFields.quality.value = config.quality || "high";
-    apiFields.provider.value = imageProviderMode(apiFields.endpoint.value);
+    const codexLocal = apiFields.provider.value === "codex-local";
+    if (!codexLocal && !apiFields.endpoint.value) {
+      apiFields.endpoint.value = config.endpoint || "";
+    }
+    if (!codexLocal && !apiFields.editEndpoint.value) {
+      apiFields.editEndpoint.value = config.editEndpoint || "";
+    }
+    if (!codexLocal && !apiFields.model.value) apiFields.model.value = config.model || "";
+    if (!codexLocal && !apiFields.size.value) {
+      apiFields.size.value = config.size || "2048x1152";
+    }
+    if (!codexLocal && !apiFields.quality.value) {
+      apiFields.quality.value = config.quality || "high";
+    }
+    apiFields.provider.value = imageProviderMode(
+      apiFields.endpoint.value,
+      apiFields.provider.value,
+    );
     refreshApiProviderGuidance();
     setConnectionState(
       mockMode
@@ -2662,6 +2742,7 @@ apiFields.provider.addEventListener("change", () => {
 });
 $("#useWukongPreset")?.addEventListener("click", () => switchApiProvider("wukong"));
 $("#useApiMartPreset")?.addEventListener("click", () => switchApiProvider("apimart"));
+$("#useCodexLocalPreset")?.addEventListener("click", () => switchApiProvider("codex-local"));
 $("#wukongProduct").addEventListener("change", (event) => {
   apiFields.model.value = event.target.value;
   updateWukongCostEstimate();

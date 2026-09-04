@@ -50,7 +50,8 @@ export function isApiMartEndpoint(value) {
   }
 }
 
-export function imageProviderMode(value) {
+export function imageProviderMode(value, explicitProvider = "") {
+  if (explicitProvider === "codex-local") return "codex-local";
   if (isWukongStudioEndpoint(value)) return "wukong";
   if (isApiMartEndpoint(value)) return "apimart";
   if (isVolcengineSeedreamEndpoint(value)) return "volcengine-seedream";
@@ -129,6 +130,7 @@ export function apiSettingsForLocalStorage(
   { connectionStatus = "pending" } = {},
 ) {
   return {
+    provider: String(settings.provider || "").trim(),
     endpoint: String(settings.endpoint || "").trim(),
     editEndpoint: String(settings.editEndpoint || "").trim(),
     apiKey: String(settings.apiKey || ""),

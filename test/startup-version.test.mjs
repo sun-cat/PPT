@@ -78,7 +78,7 @@ test("生成页面提供单页页纲及风格编辑，并只重置当前页面",
   assert.match(html, /data-edit-mode="outline">修改页纲/);
   assert.match(html, /data-edit-mode="style">修改风格和元素/);
   assert.match(html, /保存后只有这一页需要重新生成/);
-  assert.match(html, /app\.js\?v=20260826-selective-sync-v1/);
+  assert.match(html, /app\.js\?v=20260904-codex-local-v1/);
   assert.match(app, /projectFields\.scriptInput\.value = slidesToScript\(slides\)/);
   assert.match(app, /updatePageStyleScript\(/);
   assert.match(app, /function resetEditedSlide\(slide\)/);
@@ -125,24 +125,28 @@ test("悟空双推荐与计费估算免责声明清晰展示", () => {
   assert.match(app, /此金额仅供估算/);
 });
 
-test("悟空与 APIMart 提供平级快速切换并分别保存本机配置", () => {
+test("本机 Codex、悟空与 APIMart 提供平级快速切换并分别保存本机配置", () => {
   const app = fs.readFileSync("public/app.js", "utf8");
+  assert.match(html, /id="codexLocalPreset"/);
   assert.match(html, /id="wukongPreset"/);
   assert.match(html, /id="apiMartPreset"/);
-  assert.match(html, /不会互相覆盖 API Key/);
+  assert.match(html, /本机 Codex.*无需填写 API 地址或 API Key/s);
   assert.match(app, /visiondeck-api-provider-profiles-v1/);
+  assert.match(app, /switchApiProvider\("codex-local"\)/);
   assert.match(app, /switchApiProvider\("wukong"\)/);
   assert.match(app, /switchApiProvider\("apimart"\)/);
   assert.match(app, /profiles\[profileId\] = storedSettings/);
+  assert.match(app, /1 张（本机 Codex 串行）/);
+  assert.match(app, /Codex 当前使用额度/);
 });
 
 test("悟空上游超时会暂停批量提交且刷新脚本缓存", () => {
   const app = fs.readFileSync("public/app.js", "utf8");
-  assert.match(html, /app\.js\?v=20260826-selective-sync-v1/);
+  assert.match(html, /app\.js\?v=20260904-codex-local-v1/);
   assert.match(app, /generation-queue\.js\?v=20260818-wukong-migration1/);
   assert.match(app, /shouldHaltBatchGeneration/);
   assert.match(app, /上游生图超时/);
   assert.match(app, /工具不会自动重新提交/);
   assert.match(app, /if \(batchHaltReason\) return false/);
-  assert.match(app, /上游超时，批量生成已暂停/);
+  assert.match(app, /生成异常，批量生成已暂停/);
 });

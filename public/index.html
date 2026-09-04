@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>生财有术 · mini航海原创PPT课件</title>
-    <link rel="stylesheet" href="/styles.css?v=20260818-wukong-migration1" />
+    <link rel="stylesheet" href="/styles.css?v=20260904-codex-local-v1" />
   </head>
   <body>
     <a class="skip-link" href="#coursewareWorkspace">跳到主要内容</a>
@@ -968,6 +968,7 @@
               <select id="imageProvider">
                 <option value="wukong">悟空 API · 生图组</option>
                 <option value="apimart">APIMart · GPT Image 2</option>
+                <option value="codex-local">本机 Codex · 已登录账号</option>
                 <option value="volcengine-seedream">火山方舟 · 豆包 Seedream 生图</option>
                 <option value="custom">其他兼容图片 API</option>
               </select>
@@ -989,12 +990,19 @@
                 </div>
                 <button id="useApiMartPreset" class="button ghost" type="button">切换使用</button>
               </div>
+              <div id="codexLocalPreset" class="provider-preset">
+                <div>
+                  <strong>本机 Codex</strong>
+                  <p>直接使用这台电脑已登录的 Codex，无需填写 API 地址或 API Key。</p>
+                </div>
+                <button id="useCodexLocalPreset" class="button ghost" type="button">切换使用</button>
+              </div>
             </div>
             <p class="provider-presets-note">
-              悟空和 APIMart 配置分别保存在当前浏览器，切换时不会互相覆盖 API Key。
+              悟空、APIMart 和本机 Codex 配置分别保存，切换时不会互相覆盖。
             </p>
 
-            <div class="field field-wide">
+            <div id="endpointField" class="field field-wide">
               <label for="endpoint">API 服务地址 <b>必填</b></label>
               <input
                 id="endpoint"
@@ -1006,7 +1014,7 @@
             </div>
 
             <div class="basic-grid">
-              <div class="field field-wide">
+              <div id="apiKeyField" class="field field-wide">
                 <label for="apiKey">API Key <b>必填</b></label>
                 <div class="password-control">
                   <input
@@ -1072,13 +1080,13 @@
                 <path d="M8 10V7a4 4 0 0 1 8 0v3" />
               </svg>
               <div>
-                <strong>本机长期保存</strong>
-                <p>API 地址与 Key 仅保存在当前浏览器；清除浏览器数据或点击“清除本机配置”后移除。</p>
+                <strong id="localSaveTitle">本机长期保存</strong>
+                <p id="localSaveMessage">API 地址与 Key 仅保存在当前浏览器；清除浏览器数据或点击“清除本机配置”后移除。</p>
               </div>
             </div>
           </section>
 
-          <details class="advanced settings-section">
+          <details id="advancedImageSettings" class="advanced settings-section">
             <summary>
               <span class="advanced-title">
                 <span class="section-index">02</span>
@@ -1446,7 +1454,7 @@
     </template>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/app.js?v=20260826-selective-sync-v1"></script>
+    <script type="module" src="/app.js?v=20260904-codex-local-v1"></script>
     <script type="module" src="/note-tool.js?v=20260811-seeding-notes-v3"></script>
     <script type="module" src="/tools.js?v=20260826-batch-collage-v1"></script>
   </body>

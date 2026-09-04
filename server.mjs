@@ -11,6 +11,10 @@ import {
   normalizeProxyUrl,
   testImageApiConnection,
 } from "./lib/image-api.mjs";
+import {
+  generateCodexImage,
+  testCodexCliConnection,
+} from "./lib/codex-image-cli.mjs";
 import { buildImageOnlyPptx } from "./lib/presentation.mjs";
 import { extractPptxPageImages } from "./lib/pptx-images.mjs";
 import { renderPptxPageImages } from "./lib/pptx-renderer.mjs";
@@ -322,9 +326,16 @@ async function handleRequest(request, response) {
     });
 
     const imageEndpoint = input.endpoint || process.env.IMAGE_API_URL;
+    const localCodex = input.provider === "codex-local";
     const imageDataUrl =
       process.env.MOCK_IMAGE_API === "1"
         ? mockImage
+        : localCodex
+          ? await generateCodexImage({
+              prompt,
+              referenceImageDataUrl: input.referenceImageDataUrl || "",
+              referenceImageName: input.referenceImageName || "",
+            })
         : await generateSlideImage({
             endpoint: imageEndpoint,
             editEndpoint: input.editEndpoint || process.env.IMAGE_EDIT_API_URL,
@@ -352,6 +363,11 @@ async function handleRequest(request, response) {
 
   if (request.method === "POST" && url.pathname === "/api/test-connection") {
     const input = await readJson(request, 1024 * 1024);
+    if (input.provider === "codex-local") {
+      const result = await testCodexCliConnection({ cwd: rootDir });
+      sendJson(response, 200, result);
+      return;
+    }
     const imageEndpoint = input.endpoint || process.env.IMAGE_API_URL;
     const explicitProxy = String(input.proxyUrl || "").trim();
     const useSavedSystemProxy = Boolean(input.useSystemProxyForWukong);

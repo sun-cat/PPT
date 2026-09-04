@@ -47,6 +47,15 @@ test("recognizes APIMart API hosts without treating the dashboard as an API", ()
   assert.equal(imageProviderMode("https://api.apib.ai/v1"), "apimart");
 });
 
+test("keeps the explicit local Codex provider without an API endpoint", () => {
+  assert.equal(imageProviderMode("", "codex-local"), "codex-local");
+  assert.equal(
+    imageProviderMode("https://wkapi.work", "codex-local"),
+    "codex-local",
+  );
+  assert.equal(imageProviderMode("", "custom"), "custom");
+});
+
 test("normalizes an accidentally duplicated Wukong key prefix", () => {
   assert.equal(normalizeWukongApiKey(" sk-sk-example "), "sk-example");
   assert.equal(normalizeWukongApiKey("sk-example"), "sk-example");
@@ -112,6 +121,7 @@ test("removes a stale cross-provider legacy test endpoint", () => {
 
 test("keeps the API key and compatibility fields for long-term local use", () => {
   const stored = apiSettingsForLocalStorage({
+    provider: "custom",
     endpoint: " https://api.example.com/v1 ",
     apiKey: "test-key",
     model: "gpt-image-2",
@@ -120,6 +130,7 @@ test("keeps the API key and compatibility fields for long-term local use", () =>
   });
 
   assert.equal(stored.endpoint, "https://api.example.com/v1");
+  assert.equal(stored.provider, "custom");
   assert.equal(stored.apiKey, "test-key");
   assert.equal(stored.extraHeaders, '{"X-Provider-Key":"local-secret"}');
   assert.equal(stored.useSystemProxyForWukong, true);
