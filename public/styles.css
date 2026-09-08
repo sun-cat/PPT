@@ -1600,7 +1600,8 @@ button {
 .slide-actions {
   min-height: 62px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: space-between;
   gap: 12px;
   margin-top: 13px;
@@ -1615,7 +1616,15 @@ button {
   line-height: 1.45;
 }
 
-.retry-button {
+.slide-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.retry-button,
+.slide-upload-button {
+  min-width: 0;
   min-height: 36px;
   flex: 0 0 auto;
   border: 1px solid #a7c7b9;
@@ -1633,14 +1642,21 @@ button {
     border-color 150ms ease;
 }
 
-.retry-button:hover:not(:disabled) {
+.retry-button:hover:not(:disabled),
+.slide-upload-button:hover:not(:disabled) {
   border-color: var(--green);
   background: var(--green);
   color: #fff;
   transform: translateY(-1px);
 }
 
-.retry-button:disabled {
+.slide-upload-button:focus-visible {
+  outline: 3px solid rgba(46, 111, 94, 0.22);
+  outline-offset: 2px;
+}
+
+.retry-button:disabled,
+.slide-upload-button:disabled {
   cursor: not-allowed;
   opacity: 0.46;
 }
@@ -3929,6 +3945,7 @@ button {
 }
 
 .extracted-page-card.selectable {
+  position: relative;
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }

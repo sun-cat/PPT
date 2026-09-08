@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>生财有术 · mini航海原创PPT课件</title>
-    <link rel="stylesheet" href="/styles.css?v=20260904-codex-local-v1" />
+    <link rel="stylesheet" href="/styles.css?v=20260908-collage-scroll-v1" />
   </head>
   <body>
     <a class="skip-link" href="#coursewareWorkspace">跳到主要内容</a>
@@ -387,7 +387,7 @@
             <div>
               <p class="eyebrow">STEP 04 · GENERATE & REVIEW</p>
               <h1>生成并检查每一页</h1>
-              <p>每页都是一张完整的 16:9 图片，失败或不满意可以单独重试。</p>
+              <p>每页都是一张完整的 16:9 图片，可以单独重试，也可以上传自己的图片。支持 PNG、JPG、WebP，最大 12 MB，其他比例自动居中补白。</p>
             </div>
             <div class="generation-actions">
               <label class="concurrency-control" for="generationConcurrency">
@@ -1429,7 +1429,7 @@
             <span class="preview-page"></span>
             <strong>等待生成</strong>
           </div>
-          <img alt="生成的 PPT 页面预览" />
+          <img alt="PPT 页面预览" />
           <div class="preview-status"></div>
         </div>
         <div class="slide-meta">
@@ -1448,13 +1448,17 @@
         </div>
         <div class="slide-actions">
           <span class="retry-note">只生成这一页，不影响其他页面</span>
-          <button class="retry-button" type="button">生成这一页</button>
+          <div class="slide-action-buttons">
+            <button class="slide-upload-button" type="button">上传图片</button>
+            <button class="retry-button" type="button">生成这一页</button>
+          </div>
+          <input class="slide-image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
         </div>
       </article>
     </template>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/app.js?v=20260904-codex-local-v1"></script>
+    <script type="module" src="/app.js?v=20260908-slide-upload-v1"></script>
     <script type="module" src="/note-tool.js?v=20260811-seeding-notes-v3"></script>
     <script type="module" src="/tools.js?v=20260826-batch-collage-v1"></script>
   </body>

@@ -409,6 +409,7 @@ function applyImageProviderPreset(provider, { clearKey = true } = {}) {
 let slides = [];
 let nextId = 1;
 let busy = false;
+let uploadingSlideId = null;
 let sourceDirty = false;
 let mockMode = false;
 let referenceImage = null;
@@ -779,6 +780,25 @@ function renderSlides() {
         : `生成第 ${slide.pageNumber} 页`,
     );
     retry.addEventListener("click", () => generateOne(slide.id));
+    const upload = $(".slide-upload-button", card);
+    const uploadInput = $(".slide-image-input", card);
+    upload.textContent =
+      uploadingSlideId === slide.id
+        ? "正在上传…"
+        : hasPreviousImage
+          ? "上传替换"
+          : "上传图片";
+    upload.disabled = slide.status === "working" || busy || sourceDirty || styleDirty;
+    upload.setAttribute("aria-label", `上传图片${hasPreviousImage ? "替换" : "用于"}第 ${slide.pageNumber} 页`);
+    upload.title = slide.pendingTask
+      ? "使用本地图片后，本页将不再取回此前的生成任务"
+      : "支持 PNG、JPG、WebP，最大 12 MB；自动适配 16:9";
+    upload.addEventListener("click", () => uploadInput.click());
+    uploadInput.addEventListener("change", () => {
+      const file = uploadInput.files[0];
+      uploadInput.value = "";
+      uploadSlideImage(slide.id, file);
+    });
     for (const button of card.querySelectorAll(".slide-edit-button[data-edit-mode]")) {
       button.disabled =
         slide.status === "working" ||
@@ -818,6 +838,72 @@ function renderSlides() {
   });
   updateProgress();
   updateWukongCostEstimate();
+}
+
+async function uploadSlideImage(id, file) {
+  const slide = slides.find((item) => item.id === id);
+  if (!file || !slide || slide.status === "working" || busy) return;
+  if (sourceDirty || styleDirty) {
+    toast(sourceDirty ? "请先重新识别页纲" : "请先重新应用逐页要求");
+    return;
+  }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    toast("图片仅支持 PNG、JPG 或 WebP。");
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    toast("图片不能超过 12 MB。");
+    return;
+  }
+
+  busy = true;
+  uploadingSlideId = id;
+  renderSlides();
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    try {
+      await image.decode();
+    } catch {
+      throw new Error("无法读取这张图片，请选择有效的 PNG、JPG 或 WebP 图片。");
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 900;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.imageSmoothingQuality = "high";
+    const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+    const width = image.naturalWidth * scale;
+    const height = image.naturalHeight * scale;
+    context.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+    const imageDataUrl = canvas.toDataURL("image/png");
+
+    if (!slides.includes(slide) || sourceDirty || styleDirty) {
+      throw new Error("页面内容已变化，请重新选择要上传图片的页面。");
+    }
+    const hadImage = Boolean(slide.imageDataUrl);
+    const hadPendingTask = Boolean(slide.pendingTask);
+    rememberSlideHistory(slide);
+    archiveImageBlobCache.delete(slide);
+    slide.imageDataUrl = imageDataUrl;
+    slide.prompt = "";
+    slide.status = "success";
+    slide.error = "";
+    slide.pendingTask = null;
+    saveDraft();
+    await flushArchiveSave();
+    toast(`第 ${slide.pageNumber} 页图片已${hadImage ? "替换" : "上传"}${hadPendingTask ? "，本页不再取回此前的生成任务" : ""}`);
+  } catch (error) {
+    toast(error.message || "上传图片失败，请重试。");
+  } finally {
+    URL.revokeObjectURL(url);
+    uploadingSlideId = null;
+    busy = false;
+    renderSlides();
+  }
 }
 
 function openSlideEditDialog(id, mode) {
@@ -1857,7 +1943,7 @@ function defaultVisualPrompt(slide) {
 
 async function generateOne(id, { silent = false, onBatchHalt = null } = {}) {
   const slide = slides.find((item) => item.id === id);
-  if (!slide || slide.status === "working") return false;
+  if (!slide || slide.status === "working" || uploadingSlideId !== null) return false;
   if (sourceDirty || styleDirty) {
     if (!silent) {
       toast(sourceDirty ? "请先重新识别页纲" : "请先重新应用逐页要求");
@@ -2291,13 +2377,15 @@ function updateProgress() {
   $("#progressBar").style.width = `${percent}%`;
   const working = slides.filter((slide) => slide.status === "working").length;
   $("#progressText").textContent = total
-    ? busy
-      ? `${working} 张生成中 · ${completed} / ${total} 页已完成`
-      : `${completed} / ${total} 页已生成`
+    ? uploadingSlideId !== null
+      ? `正在上传图片 · ${completed} / ${total} 页已完成`
+      : busy
+        ? `${working} 张生成中 · ${completed} / ${total} 页已完成`
+        : `${completed} / ${total} 页已完成`
     : "等待识别页纲";
   const generateAllButton = $("#generateAllButton");
   generateAllButton.disabled = !total || busy || sourceDirty || styleDirty;
-  generateAllButton.innerHTML = busy
+  generateAllButton.innerHTML = busy && uploadingSlideId === null
     ? "正在并发生成… <span>↗</span>"
     : "批量生成全部画面 <span>↗</span>";
   const concurrencyControl = $("#generationConcurrency");

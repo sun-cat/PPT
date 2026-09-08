@@ -78,7 +78,7 @@ test("生成页面提供单页页纲及风格编辑，并只重置当前页面",
   assert.match(html, /data-edit-mode="outline">修改页纲/);
   assert.match(html, /data-edit-mode="style">修改风格和元素/);
   assert.match(html, /保存后只有这一页需要重新生成/);
-  assert.match(html, /app\.js\?v=20260904-codex-local-v1/);
+  assert.match(html, /app\.js\?v=20260908-slide-upload-v1/);
   assert.match(app, /projectFields\.scriptInput\.value = slidesToScript\(slides\)/);
   assert.match(app, /updatePageStyleScript\(/);
   assert.match(app, /function resetEditedSlide\(slide\)/);
@@ -142,7 +142,7 @@ test("本机 Codex、悟空与 APIMart 提供平级快速切换并分别保存�
 
 test("悟空上游超时会暂停批量提交且刷新脚本缓存", () => {
   const app = fs.readFileSync("public/app.js", "utf8");
-  assert.match(html, /app\.js\?v=20260904-codex-local-v1/);
+  assert.match(html, /app\.js\?v=20260908-slide-upload-v1/);
   assert.match(app, /generation-queue\.js\?v=20260818-wukong-migration1/);
   assert.match(app, /shouldHaltBatchGeneration/);
   assert.match(app, /上游生图超时/);
