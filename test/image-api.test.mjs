@@ -17,6 +17,15 @@ import {
   testImageApiConnection,
 } from "../lib/image-api.mjs";
 
+function disconnectedResponse(headers) {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new TypeError("terminated", { cause: { code: "UND_ERR_SOCKET" } }));
+    },
+  });
+  return new Response(body, { headers });
+}
+
 test("normalizes a local HTTP proxy address", () => {
   assert.equal(
     normalizeProxyUrl("127.0.0.1:7897"),
@@ -659,9 +668,7 @@ test("retries Wukong polling after a transient reset without resubmitting the pa
         if (href.includes("/poll?")) {
           pollCount += 1;
           if (pollCount === 1) {
-            const error = new Error("fetch failed");
-            error.cause = { code: "ECONNRESET" };
-            throw error;
+            return disconnectedResponse({ "content-type": "application/json" });
           }
           return new Response(
             JSON.stringify({ status: "succeeded", url: "data:image/png;base64,YWJj" }),
@@ -1005,7 +1012,8 @@ test("auto-adjusts a chat-only image model to the provider image endpoint model"
   assert.match(result.message, /未开放图片生成端点/);
 });
 
-test("distinguishes an upstream reset from a stopped proxy", async () => {
+test("reports an unknown generation outcome without replaying a paid request", async () => {
+  let submitCount = 0;
   await assert.rejects(
     () =>
       generateSlideImage(
@@ -1018,14 +1026,79 @@ test("distinguishes an upstream reset from a stopped proxy", async () => {
         },
         {
           fetchImpl: async () => {
+            submitCount += 1;
             throw new TypeError("fetch failed", {
-              cause: { code: "ECONNRESET" },
+              cause: { code: "UND_ERR_SOCKET" },
             });
           },
         },
       ),
-    /上游图片服务中途断开连接（ECONNRESET）/,
+    /UND_ERR_SOCKET.*请先到服务商后台核对/,
   );
+  assert.equal(submitCount, 1);
+});
+
+test("retries a disconnected image download without resubmitting generation", async () => {
+  const methods = [];
+  const result = await generateSlideImage(
+    {
+      endpoint: "https://api.example.com/v1",
+      prompt: "test",
+    },
+    {
+      fetchImpl: async (_url, { method }) => {
+        methods.push(method);
+        if (method === "POST") {
+          return Response.json({ data: [{ url: "https://cdn.example.com/result.png" }] });
+        }
+        if (methods.length === 2) {
+          return disconnectedResponse({ "content-type": "image/png" });
+        }
+        return new Response("abc", { headers: { "content-type": "image/png" } });
+      },
+    },
+  );
+  assert.deepEqual(methods, ["POST", "GET", "GET"]);
+  assert.equal(result, "data:image/png;base64,YWJj");
+});
+
+test("keeps the service request ID when the generation response body disconnects", async () => {
+  await assert.rejects(
+    generateSlideImage(
+      { endpoint: "https://api.example.com/v1", prompt: "test" },
+      {
+        fetchImpl: async () => disconnectedResponse({ "x-request-id": "image-request-123" }),
+      },
+    ),
+    /读取生图响应时连接中断.*image-request-123/,
+  );
+});
+
+test("preserves a submitted task ID when its image cannot be downloaded", async () => {
+  for (const [endpoint, submission, productId] of [
+    ["https://wkapi.work", { task_id: "recover-me" }, "image_nanoBanana2"],
+    ["https://api.aiuxu.com/v1", { data: [{ task_id: "recover-me" }] }, "apimart:gpt-image-2"],
+  ]) {
+    const methods = [];
+    await assert.rejects(
+      generateSlideImage(
+        { endpoint, prompt: "test" },
+        {
+          pollIntervalMs: 0,
+          fetchImpl: async (url, { method }) => {
+            methods.push(method);
+            if (method === "POST") return Response.json(submission);
+            if (String(url) === "https://cdn.example.com/result.png") {
+              return new Response(null, { status: 404 });
+            }
+            return Response.json({ url: "https://cdn.example.com/result.png" });
+          },
+        },
+      ),
+      { wukongTaskPending: true, wukongTaskId: "recover-me", wukongProductId: productId },
+    );
+    assert.deepEqual(methods, ["POST", "GET", "GET"]);
+  }
 });
 
 test("retries a safe connection check once after a transient network error", async () => {

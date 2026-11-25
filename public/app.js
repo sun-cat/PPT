@@ -1909,24 +1909,22 @@ async function testConnection() {
 
 function friendlyGenerationError(error) {
   const message = String(error?.message || error || "图片生成失败。");
-  if (/上游生图超时|图片生成超时/.test(message)) {
-    return "API 中转站上游生图超时，本次没有取得图片。请先到中转站后台核对该任务是否扣费，再切换 NanoBanana 2 或 GPT-Image-2 中的另一个推荐模型后重试；工具不会自动重新提交。";
-  }
-  if (/上游图片服务中途断开连接/.test(message)) {
-    return `${message} 当前平台请先在“接口设置”里重新检测，工具会自动选择其开放的生图模型。`;
+  if (message.startsWith("取回图片")) return message;
+  if (/上游生图超时/.test(message)) {
+    return `${message} 请先到服务商后台核对本次任务和扣费。工具不会自动重新提交。`;
   }
   if (/无可用渠道/.test(message)) {
     return "当前图片模型不可用。请打开“接口设置”并重新检测，工具会自动匹配该平台开放的生图模型。";
   }
   if (/HTTP 503/.test(message)) {
-    return "图片服务暂时繁忙（HTTP 503），请稍后点击“生成本页”重试。";
+    return "图片服务暂时繁忙（HTTP 503）。请先到服务商后台核对本次任务和扣费。";
   }
   return message;
 }
 
 function shouldHaltBatchGeneration(error) {
   const message = String(error?.message || error || "");
-  return /上游生图超时|图片生成超时|上游图片服务中途断开连接|无可用渠道|HTTP 503|图片服务暂时繁忙|通道.*(?:繁忙|不可用)|本机 Codex|Codex CLI|Codex 当前使用额度|Codex 图片生成失败|Codex 已结束运行/i.test(message);
+  return /上游生图超时|图片生成超时|取回图片(?:超时|失败)|时连接中断|无可用渠道|HTTP 503|图片服务暂时繁忙|通道.*(?:繁忙|不可用)|本机 Codex|Codex CLI|Codex 当前使用额度|Codex 图片生成失败|Codex 已结束运行/i.test(message);
 }
 
 function defaultVisualPrompt(slide) {
@@ -2101,7 +2099,7 @@ async function generateAll() {
     toast(
       settings.provider === "codex-local"
         ? `已暂停后续生图，剩余 ${unsubmitted} 页未提交；请先处理 Codex 提示`
-        : `已暂停后续提交，剩余 ${unsubmitted} 页未提交；请先核对扣费并切换模型`,
+        : `已暂停后续提交，剩余 ${unsubmitted} 页未提交。请查看对应页面的提示`,
     );
   } else {
     toast(
